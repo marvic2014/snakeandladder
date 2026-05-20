@@ -1413,7 +1413,12 @@
                 diceBtn.innerText = `🏆 ${winningPlayer ? winningPlayer.name : 'Someone'} Won!`;
                 diceBtn.className = "w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
             } else {
-                if (currentRollPlayer.uid === currentConnectedPlayerId || currentRole === 'teacher-host') {
+                if (currentRole === 'teacher-host') {
+                    // Teacher is strictly a spectator in live sessions
+                    diceBtn.disabled = true;
+                    diceBtn.innerText = `👀 Spectating: ${currentRollPlayer.name}'s Turn`;
+                    diceBtn.className = "w-full bg-indigo-100 text-indigo-800 border-2 border-indigo-200 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
+                } else if (currentRollPlayer.uid === currentConnectedPlayerId) {
                     diceBtn.disabled = false;
                     diceBtn.innerText = "🎲 YOUR TURN: ROLL!";
                     diceBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
