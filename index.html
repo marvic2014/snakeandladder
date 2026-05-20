@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Educational Snakes & Ladders Live</title>
+    <title>Educational Snakes And Ladders Live</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -974,7 +974,6 @@
         let collectionsUnsubscribe = null;
 
         function subscribeToCollections() {
-            // Safety guard to prevent active sub checks running under anonymous identities
             if (!currentUser || currentUser.isAnonymous) {
                 dbCollections = [];
                 updateCollectionsDropdown();
@@ -984,7 +983,7 @@
 
             if (collectionsUnsubscribe) return;
 
-            // PRIVATE STORAGE BOUND TO UNIQUE TEACHER USER UID (Rule 1 Compliance)
+            // PRIVATE STORAGE BOUND TO UNIQUE TEACHER USER UID
             const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections');
             collectionsUnsubscribe = onSnapshot(colRef, (snap) => {
                 dbCollections = [];
@@ -1012,15 +1011,12 @@
 
         // --- AUTHENTICATION FLOW SETUP ---
         const initAuth = async () => {
-            await auth.authStateReady();
-            if (auth.currentUser) return;
-
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     try {
                         await signInWithCustomToken(auth, __initial_auth_token);
                     } catch (tokenError) {
-                        console.warn("Custom token sign-in failed, falling back to anonymous authentication:", tokenError);
+                        console.warn("Custom token failed, falling back to anonymous authentication:", tokenError);
                         await signInAnonymously(auth);
                     }
                 } else {
@@ -1033,11 +1029,12 @@
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
+            updateDashboardUI();
+            
             if (user) {
                 const badge = document.getElementById('teacher-status-badge');
                 if (user.isAnonymous) {
                     badge.classList.add('hidden');
-                    // Anonymous sessions (including students) must teardown private hooks
                     if (collectionsUnsubscribe) {
                         collectionsUnsubscribe();
                         collectionsUnsubscribe = null;
@@ -1048,7 +1045,6 @@
                 } else {
                     badge.classList.remove('hidden');
                     badge.innerText = `Teacher: ${user.email.split('@')[0]}`;
-                    updateDashboardUI();
                     subscribeToCollections();
                 }
             } else {
@@ -1057,11 +1053,18 @@
                     collectionsUnsubscribe();
                     collectionsUnsubscribe = null;
                 }
+                dbCollections = [];
+                updateCollectionsDropdown();
+                renderCollectionsSidebar();
             }
         });
 
-        // Initialize Authentication immediately
-        initAuth();
+        // Initialize Authentication
+        try {
+            initAuth();
+        } catch (e) {
+            console.error(e);
+        }
 
         // --- AUTHENTICATION ACTIONS ---
         function handleTeacherLogin() {
@@ -1104,7 +1107,6 @@
         window.handleAnonymousLogin = handleAnonymousLogin;
 
         function handleSignOut() {
-            // TEARDOWN ACTIVE SNAPSHOT LISTENER BEFORE CLOSING AUTHENTICATION CHANNELS
             if (collectionsUnsubscribe) {
                 collectionsUnsubscribe();
                 collectionsUnsubscribe = null;
@@ -1112,7 +1114,6 @@
             dbCollections = [];
             selectedCollectionId = null;
 
-            // Reset UI states
             document.getElementById('collection-detail').classList.add('hidden');
             document.getElementById('no-collection-selected').classList.remove('hidden');
 
@@ -1800,7 +1801,8 @@
 
                 const roll = Math.floor(Math.random() * 6) + 1;
                 
-                let activePlayer = rData.players[rData.currentPlayerIndex];
+                // Deep clone to guarantee Firestore detects the state change
+                let activePlayer = { ...rData.players[rData.currentPlayerIndex] };
                 let oldPos = activePlayer.position;
                 let newPos = oldPos + roll;
 
@@ -1873,7 +1875,7 @@
         async function triggerTriviaChallenge(player, isLadder) {
             return new Promise((resolve) => {
                 if (gameDeck.length === 0) {
-                    resolve(true); 
+                    resolve(isLadder); 
                     return;
                 }
 
@@ -1913,7 +1915,9 @@
                     answered = true;
                     clearInterval(timerInterval);
                     modal.classList.add('hidden');
-                    resolve(key === randQ.correct);
+                    // Robust string matching to prevent hidden formatting bugs
+                    const isCorrect = key !== null && String(key).trim().toUpperCase() === String(randQ.correct).trim().toUpperCase();
+                    resolve(isCorrect);
                 };
 
                 for (let k in map) {
@@ -1930,31 +1934,62 @@
 
         async function verifySnakeLadderCloud(index, playersArray, logs) {
             const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
-            let player = playersArray[index];
+            // Deep clone target object
+            let player = { ...playersArray[index] };
+            const hasQuestions = gameDeck && gameDeck.length > 0;
 
             if (ladders[player.position]) {
                 const target = ladders[player.position];
-                logs.unshift(`🧠 quiz! <b>${player.name}</b> lands on a ladder. Answer correctly to climb!`);
-                await updateDoc(roomDocRef, { logEvents: logs });
+                
+                if (hasQuestions) {
+                    logs.unshift(`🧠 quiz! <b>${player.name}</b> lands on a ladder. Answer correctly to climb!`);
+                    await updateDoc(roomDocRef, { logEvents: logs });
 
-                const passed = await triggerTriviaChallenge(player, true);
-                if (passed) {
-                    logs.unshift(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
-                    player.position = target;
+                    const passed = await triggerTriviaChallenge(player, true);
+                    if (passed) {
+                        logs.unshift(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
+                        player.position = target;
+                        // Force immediate visual update to skip lag
+                        if(players[index]) {
+                            players[index].position = target;
+                            updateTokenPosition(index);
+                        }
+                    } else {
+                        logs.unshift(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
+                    }
                 } else {
-                    logs.unshift(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
+                    logs.unshift(`🚀 <b>${player.name}</b> climbed a ladder up to tile ${target}!`);
+                    player.position = target;
+                    if(players[index]) {
+                        players[index].position = target;
+                        updateTokenPosition(index);
+                    }
                 }
             } else if (snakes[player.position]) {
                 const target = snakes[player.position];
-                logs.unshift(`🧠 defense! <b>${player.name}</b> hit a snake. Answer correctly to block slide!`);
-                await updateDoc(roomDocRef, { logEvents: logs });
+                
+                if (hasQuestions) {
+                    logs.unshift(`🧠 defense! <b>${player.name}</b> hit a snake. Answer correctly to block slide!`);
+                    await updateDoc(roomDocRef, { logEvents: logs });
 
-                const passed = await triggerTriviaChallenge(player, false);
-                if (passed) {
-                    logs.unshift(`🛡️ Blocked! <b>${player.name}</b> successfully dodged sliding down the snake!`);
+                    const passed = await triggerTriviaChallenge(player, false);
+                    if (passed) {
+                        logs.unshift(`🛡️ Blocked! <b>${player.name}</b> successfully dodged sliding down the snake!`);
+                    } else {
+                        logs.unshift(`❌ Incorrect! 🐍 <b>${player.name}</b> slid down to tile ${target}!`);
+                        player.position = target;
+                        if(players[index]) {
+                            players[index].position = target;
+                            updateTokenPosition(index);
+                        }
+                    }
                 } else {
-                    logs.unshift(`❌ Incorrect! 🐍 <b>${player.name}</b> slid down to tile ${target}!`);
+                    logs.unshift(`🐍 Oh no! <b>${player.name}</b> slid down a snake to tile ${target}!`);
                     player.position = target;
+                    if(players[index]) {
+                        players[index].position = target;
+                        updateTokenPosition(index);
+                    }
                 }
             }
 
@@ -1980,29 +2015,46 @@
 
         async function checkSnakeLadderLocal(index) {
             let player = players[index];
+            const hasQuestions = gameDeck && gameDeck.length > 0;
             
             if (ladders[player.position]) {
                 const target = ladders[player.position];
-                logMessage(`🧠 quiz! <b>${player.name}</b> lands on a ladder. Answer correctly to climb!`);
                 
-                const passed = await triggerTriviaChallenge(player, true);
-                if (passed) {
-                    logMessage(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
+                if (hasQuestions) {
+                    logMessage(`🧠 quiz! <b>${player.name}</b> lands on a ladder. Answer correctly to climb!`);
+                    
+                    const passed = await triggerTriviaChallenge(player, true);
+                    if (passed) {
+                        logMessage(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
+                        player.position = target;
+                        updateTokenPosition(index);
+                        await sleep(600);
+                    } else {
+                        logMessage(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
+                    }
+                } else {
+                    logMessage(`🚀 <b>${player.name}</b> climbed a ladder up to tile ${target}!`);
                     player.position = target;
                     updateTokenPosition(index);
                     await sleep(600);
-                } else {
-                    logMessage(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
                 }
             } else if (snakes[player.position]) {
                 const target = snakes[player.position];
-                logMessage(`🧠 defense! <b>${player.name}</b> stepped on a snake. Answer correctly to block slide!`);
                 
-                const passed = await triggerTriviaChallenge(player, false);
-                if (passed) {
-                    logMessage(`🛡️ Safe! <b>${player.name}</b> successfully dodged sliding down the snake!`);
+                if (hasQuestions) {
+                    logMessage(`🧠 defense! <b>${player.name}</b> stepped on a snake. Answer correctly to block slide!`);
+                    
+                    const passed = await triggerTriviaChallenge(player, false);
+                    if (passed) {
+                        logMessage(`🛡️ Safe! <b>${player.name}</b> successfully dodged sliding down the snake!`);
+                    } else {
+                        logMessage(`❌ Incorrect! 🐍 <b>${player.name}</b> slid down to tile ${target}!`);
+                        player.position = target;
+                        updateTokenPosition(index);
+                        await sleep(600);
+                    }
                 } else {
-                    logMessage(`❌ Incorrect! 🐍 <b>${player.name}</b> slid down to tile ${target}!`);
+                    logMessage(`🐍 Oh no! <b>${player.name}</b> slid down a snake to tile ${target}!`);
                     player.position = target;
                     updateTokenPosition(index);
                     await sleep(600);
@@ -2070,9 +2122,13 @@
         });
 
         // Bootstrap on startup
-        createBoard();
-        generatePlayerInputs();
-        drawSnakesAndLadders();
+        try {
+            createBoard();
+            generatePlayerInputs();
+            drawSnakesAndLadders();
+        } catch (e) {
+            console.error("Board rendering error on startup:", e);
+        }
     </script>
 </body>
 </html>
