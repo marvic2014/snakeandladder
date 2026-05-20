@@ -544,23 +544,24 @@
         let gameActive = false;
         let gameDeck = [];
 
-        // UI Alert replacement
-        window.showAlert = function(title, text, icon = "ℹ️") {
+        // --- DECLARE LOCAL MODULE FUNCTIONS ---
+
+        function showAlert(title, text, icon = "ℹ️") {
             document.getElementById('alert-title').innerText = title;
             document.getElementById('alert-text').innerText = text;
             document.getElementById('alert-icon').innerText = icon;
             document.getElementById('custom-alert').classList.remove('hidden');
-        };
+        }
+        window.showAlert = showAlert;
 
-        window.closeAlert = function() {
+        function closeAlert() {
             document.getElementById('custom-alert').classList.add('hidden');
-        };
+        }
+        window.closeAlert = closeAlert;
 
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // --- CORE HELPER FUNCTIONS DECLARATIONS (Declared early to prevent ReferenceErrors) ---
-
-        window.createBoard = function() {
+        function createBoard() {
             const board = document.getElementById('board');
             board.innerHTML = '';
             
@@ -577,9 +578,10 @@
                     board.appendChild(cell);
                 }
             }
-        };
+        }
+        window.createBoard = createBoard;
 
-        window.generatePlayerInputs = function() {
+        function generatePlayerInputs() {
             const count = document.getElementById('player-count').value;
             const container = document.getElementById('player-names-inputs');
             container.innerHTML = '';
@@ -591,7 +593,8 @@
                     </div>
                 `;
             }
-        };
+        }
+        window.generatePlayerInputs = generatePlayerInputs;
 
         function updateCollectionsDropdown() {
             const select = document.getElementById('game-collection-select');
@@ -949,54 +952,62 @@
         initAuth();
 
         // --- AUTHENTICATION ACTIONS ---
-        window.handleTeacherLogin = async function() {
+        function handleTeacherLogin() {
             const email = document.getElementById('teacher-email').value.trim();
             const password = document.getElementById('teacher-password').value;
             if (!email || !password) return;
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                showAlert("Welcome", "Logged in successfully!", "🔐");
-            } catch (err) {
-                showAlert("Login Failed", err.message, "❌");
-            }
-        };
+            signInWithEmailAndPassword(auth, email, password)
+                .then(() => {
+                    showAlert("Welcome", "Logged in successfully!", "🔐");
+                })
+                .catch((err) => {
+                    showAlert("Login Failed", err.message, "❌");
+                });
+        }
+        window.handleTeacherLogin = handleTeacherLogin;
 
-        window.handleTeacherRegister = async function() {
+        function handleTeacherRegister() {
             const email = document.getElementById('teacher-email').value.trim();
             const password = document.getElementById('teacher-password').value;
             if (!email || !password) return;
-            try {
-                await createUserWithEmailAndPassword(auth, email, password);
-                showAlert("Registration Complete", "New account created & logged in!", "📝");
-            } catch (err) {
-                showAlert("Registration Failed", err.message, "❌");
-            }
-        };
+            createUserWithEmailAndPassword(auth, email, password)
+                .then(() => {
+                    showAlert("Registration Complete", "New account created & logged in!", "📝");
+                })
+                .catch((err) => {
+                    showAlert("Registration Failed", err.message, "❌");
+                });
+        }
+        window.handleTeacherRegister = handleTeacherRegister;
 
-        window.handleAnonymousLogin = async function() {
-            try {
-                await signInAnonymously(auth);
-                showAlert("Guest Portal", "Signed in as Guest.");
-            } catch (err) {
-                showAlert("Error", err.message);
-            }
-        };
+        function handleAnonymousLogin() {
+            signInAnonymously(auth)
+                .then(() => {
+                    showAlert("Guest Portal", "Signed in as Guest.");
+                })
+                .catch((err) => {
+                    showAlert("Error", err.message);
+                });
+        }
+        window.handleAnonymousLogin = handleAnonymousLogin;
 
-        window.handleSignOut = async function() {
-            try {
-                await signOut(auth);
-                await signInAnonymously(auth);
-                selectedCollectionId = null;
-                document.getElementById('collection-detail').classList.add('hidden');
-                document.getElementById('no-collection-selected').classList.remove('hidden');
-                showAlert("Signed Out", "Returned to Guest Portal mode.");
-            } catch (err) {
-                console.error(err);
-            }
-        };
+        function handleSignOut() {
+            signOut(auth)
+                .then(() => {
+                    signInAnonymously(auth);
+                    selectedCollectionId = null;
+                    document.getElementById('collection-detail').classList.add('hidden');
+                    document.getElementById('no-collection-selected').classList.remove('hidden');
+                    showAlert("Signed Out", "Returned to Guest Portal mode.");
+                })
+                .catch((err) => {
+                    console.error(err);
+                });
+        }
+        window.handleSignOut = handleSignOut;
 
         // --- DUAL MODE CONFIGS ---
-        window.setGameMode = function(mode) {
+        function setGameMode(mode) {
             activeDeviceMode = mode;
             const btnLocal = document.getElementById('btn-local-mode');
             const btnSession = document.getElementById('btn-session-mode');
@@ -1014,7 +1025,8 @@
                 panelLocal.classList.add('hidden');
                 panelSession.classList.remove('hidden');
             }
-        };
+        }
+        window.setGameMode = setGameMode;
 
         // --- MULTIPLAYER ROOM ENGINE ---
         function generateRoomCode() {
@@ -1026,7 +1038,7 @@
             return code;
         }
 
-        window.hostLiveSession = async function() {
+        function hostLiveSession() {
             if (!currentUser || currentUser.isAnonymous) {
                 showAlert("Authentication Required", "Please log in with email and password to host multiplayer matches.", "🔒");
                 return;
@@ -1036,22 +1048,19 @@
             if (!colObj) return;
 
             const roomCode = generateRoomCode();
-            try {
-                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', roomCode);
-                
-                await setDoc(roomDocRef, {
-                    sessionId: roomCode,
-                    teacherId: currentUser.uid,
-                    deckName: colObj.name,
-                    questions: colObj.questions || [],
-                    status: 'waiting', 
-                    players: [],
-                    currentPlayerIndex: 0,
-                    diceResult: '-',
-                    logEvents: [],
-                    timestamp: Date.now()
-                });
-
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', roomCode), {
+                sessionId: roomCode,
+                teacherId: currentUser.uid,
+                deckName: colObj.name,
+                questions: colObj.questions || [],
+                status: 'waiting', 
+                players: [],
+                currentPlayerIndex: 0,
+                diceResult: '-',
+                logEvents: [],
+                timestamp: Date.now()
+            })
+            .then(() => {
                 switchTab('game');
                 setGameMode('session');
                 
@@ -1073,12 +1082,14 @@
                 }
 
                 listenToRoomState(roomCode);
-            } catch (err) {
+            })
+            .catch((err) => {
                 showAlert("Error", "Could not spin up live session: " + err.message);
-            }
-        };
+            });
+        }
+        window.hostLiveSession = hostLiveSession;
 
-        window.joinLiveSession = async function() {
+        function joinLiveSession() {
             const codeInput = document.getElementById('join-session-code').value.trim().toUpperCase();
             const playerName = document.getElementById('join-player-name').value.trim();
 
@@ -1087,71 +1098,73 @@
                 return;
             }
 
-            try {
-                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', codeInput);
-                const roomSnap = await getDoc(roomDocRef);
+            const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', codeInput);
+            getDoc(roomDocRef)
+                .then((roomSnap) => {
+                    if (!roomSnap.exists()) {
+                        showAlert("Invalid Code", "No active session matching that room code was found.", "❓");
+                        return;
+                    }
 
-                if (!roomSnap.exists()) {
-                    showAlert("Invalid Code", "No active session matching that room code was found.", "❓");
-                    return;
-                }
+                    const roomData = roomSnap.data();
+                    if (roomData.status !== 'waiting') {
+                        showAlert("Cannot Join", "This match has already started or finished.", "🚫");
+                        return;
+                    }
 
-                const roomData = roomSnap.data();
-                if (roomData.status !== 'waiting') {
-                    showAlert("Cannot Join", "This match has already started or finished.", "🚫");
-                    return;
-                }
+                    const deviceUserId = currentUser ? currentUser.uid : crypto.randomUUID();
+                    currentConnectedPlayerId = deviceUserId;
 
-                const deviceUserId = currentUser ? currentUser.uid : crypto.randomUUID();
-                currentConnectedPlayerId = deviceUserId;
+                    const joinedPlayerObj = {
+                        uid: deviceUserId,
+                        name: playerName,
+                        position: 0,
+                        color: playerColors[roomData.players.length % playerColors.length]
+                    };
 
-                const joinedPlayerObj = {
-                    uid: deviceUserId,
-                    name: playerName,
-                    position: 0,
-                    color: playerColors[roomData.players.length % playerColors.length]
-                };
+                    const updatedPlayers = [...roomData.players, joinedPlayerObj];
+                    return updateDoc(roomDocRef, {
+                        players: updatedPlayers
+                    }).then(() => {
+                        document.getElementById('game-selection-panel').classList.add('hidden');
+                        document.getElementById('session-lobby-panel').classList.remove('hidden');
+                        document.getElementById('lobby-code-badge').innerText = codeInput;
 
-                const updatedPlayers = [...roomData.players, joinedPlayerObj];
-                await updateDoc(roomDocRef, {
-                    players: updatedPlayers
+                        const startBtn = document.getElementById('btn-lobby-host-start');
+                        if (startBtn) startBtn.remove();
+
+                        currentRole = 'player';
+                        activeRoomId = codeInput;
+
+                        listenToRoomState(codeInput);
+                    });
+                })
+                .catch((err) => {
+                    showAlert("Failed to Join", err.message);
                 });
+        }
+        window.joinLiveSession = joinLiveSession;
 
-                document.getElementById('game-selection-panel').classList.add('hidden');
-                document.getElementById('session-lobby-panel').classList.remove('hidden');
-                document.getElementById('lobby-code-badge').innerText = codeInput;
-
-                const startBtn = document.getElementById('btn-lobby-host-start');
-                if (startBtn) startBtn.remove();
-
-                currentRole = 'player';
-                activeRoomId = codeInput;
-
-                listenToRoomState(codeInput);
-            } catch (err) {
-                showAlert("Failed to Join", err.message);
-            }
-        };
-
-        window.hostStartRoom = async function() {
+        function hostStartRoom() {
             if (!activeRoomId) return;
             const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
-            const snap = await getDoc(roomDocRef);
-            
-            if (snap.exists()) {
-                const rData = snap.data();
-                if (rData.players.length < 2) {
-                    showAlert("Waiting", "Please wait for at least 2 students to connect their devices first.", "⌛");
-                    return;
+            getDoc(roomDocRef).then((snap) => {
+                if (snap.exists()) {
+                    const rData = snap.data();
+                    if (rData.players.length < 2) {
+                        showAlert("Waiting", "Please wait for at least 2 students to connect their devices first.", "⌛");
+                        return;
+                    }
+                    
+                    updateDoc(roomDocRef, {
+                        status: 'playing',
+                        currentPlayerIndex: 0,
+                        logEvents: ['⚔️ Multiplayer session started! Answer quiz prompts to move!']
+                    });
                 }
-                
-                await updateDoc(roomDocRef, {
-                    status: 'playing',
-                    currentPlayerIndex: 0,
-                    logEvents: ['⚔️ Multiplayer session started! Answer quiz prompts to move!']
-                });
-            }
-        };
+            });
+        }
+        window.hostStartRoom = hostStartRoom;
 
         function listenToRoomState(roomCode) {
             if (roomUnsubscribeListener) roomUnsubscribeListener();
@@ -1262,7 +1275,7 @@
         }
 
         // --- COLLECTION SELECTION ENGINE ---
-        window.selectCollection = function(colId) {
+        function selectCollection(colId) {
             selectedCollectionId = colId;
             renderCollectionsSidebar();
 
@@ -1275,51 +1288,71 @@
 
             document.getElementById('current-col-title').innerText = colObj.name;
             renderQuestionsGrid(colObj);
-        };
+        }
+        window.selectCollection = selectCollection;
 
         // --- DASHBOARD WRITES (Rule 1) ---
-        window.openCreateCollectionModal = () => document.getElementById('create-collection-modal').classList.remove('hidden');
-        window.closeCreateCollectionModal = () => document.getElementById('create-collection-modal').classList.add('hidden');
+        function openCreateCollectionModal() {
+            document.getElementById('create-collection-modal').classList.remove('hidden');
+        }
+        window.openCreateCollectionModal = openCreateCollectionModal;
 
-        window.submitNewCollection = async function() {
+        function closeCreateCollectionModal() {
+            document.getElementById('create-collection-modal').classList.add('hidden');
+        }
+        window.closeCreateCollectionModal = closeCreateCollectionModal;
+
+        function submitNewCollection() {
             const name = document.getElementById('new-collection-name').value.trim();
             if (!name) return;
 
-            try {
-                const docRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections'));
-                await setDoc(docRef, {
-                    name: name,
-                    teacherId: currentUser.uid,
-                    questions: []
-                });
-
+            const docRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections'));
+            setDoc(docRef, {
+                name: name,
+                teacherId: currentUser.uid,
+                questions: []
+            })
+            .then(() => {
                 document.getElementById('new-collection-name').value = '';
                 closeCreateCollectionModal();
-                await fetchCollections();
+                return fetchCollections();
+            })
+            .then(() => {
                 selectCollection(docRef.id);
                 showAlert("Success", `Deck "${name}" added.`, "✅");
-            } catch (err) {
+            })
+            .catch((err) => {
                 showAlert("Error", err.message);
-            }
-        };
+            });
+        }
+        window.submitNewCollection = submitNewCollection;
 
-        window.deleteCollection = async function(colId) {
+        function deleteCollection(colId) {
             if (!confirm("Delete this deck permanently?")) return;
-            try {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', colId));
-                selectedCollectionId = null;
-                document.getElementById('collection-detail').classList.add('hidden');
-                document.getElementById('no-collection-selected').classList.remove('hidden');
-                await fetchCollections();
-            } catch (err) {
-                showAlert("Error", err.message);
-            }
-        };
+            deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', colId))
+                .then(() => {
+                    selectedCollectionId = null;
+                    document.getElementById('collection-detail').classList.add('hidden');
+                    document.getElementById('no-collection-selected').classList.remove('hidden');
+                    return fetchCollections();
+                })
+                .catch((err) => {
+                    showAlert("Error", err.message);
+                });
+        }
+        window.deleteCollection = deleteCollection;
 
-        window.openManualQuestionModal = () => document.getElementById('manual-question-modal').classList.remove('hidden');
-        window.closeManualQuestionModal = () => document.getElementById('manual-question-modal').classList.add('hidden');
+        function openManualQuestionModal() {
+            document.getElementById('manual-question-modal').classList.remove('hidden');
+        }
+        window.openManualQuestionModal = openManualQuestionModal;
 
-        window.submitManualQuestion = async function() {
+        function closeManualQuestionModal() {
+            document.getElementById('manual-question-modal').classList.add('hidden');
+        }
+        window.closeManualQuestionModal = closeManualQuestionModal;
+
+        function submitManualQuestion() {
             const question = document.getElementById('manual-prompt').value.trim();
             const a = document.getElementById('manual-a').value.trim();
             const b = document.getElementById('manual-b').value.trim();
@@ -1330,51 +1363,65 @@
             if (!question || !a || !b || !c || !d) return;
 
             const newCard = { question, a, b, c, d, correct };
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
-                await updateDoc(docRef, { questions: arrayUnion(newCard) });
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+            updateDoc(docRef, { questions: arrayUnion(newCard) })
+                .then(() => {
+                    document.getElementById('manual-prompt').value = '';
+                    document.getElementById('manual-a').value = '';
+                    document.getElementById('manual-b').value = '';
+                    document.getElementById('manual-c').value = '';
+                    document.getElementById('manual-d').value = '';
 
-                document.getElementById('manual-prompt').value = '';
-                document.getElementById('manual-a').value = '';
-                document.getElementById('manual-b').value = '';
-                document.getElementById('manual-c').value = '';
-                document.getElementById('manual-d').value = '';
+                    closeManualQuestionModal();
+                    return fetchCollections();
+                })
+                .then(() => {
+                    selectCollection(selectedCollectionId);
+                })
+                .catch((err) => {
+                    showAlert("Error", err.message);
+                });
+        }
+        window.submitManualQuestion = submitManualQuestion;
 
-                closeManualQuestionModal();
-                await fetchCollections();
-                selectCollection(selectedCollectionId);
-            } catch (err) {
-                showAlert("Error", err.message);
-            }
-        };
-
-        window.deleteQuestion = async function(idx) {
+        function deleteQuestion(idx) {
             const colObj = dbCollections.find(c => c.id === selectedCollectionId);
             if (!colObj) return;
 
             const list = [...colObj.questions];
             list.splice(idx, 1);
 
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
-                await updateDoc(docRef, { questions: list });
-                await fetchCollections();
-                selectCollection(selectedCollectionId);
-            } catch (err) {
-                showAlert("Error", err.message);
-            }
-        };
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+            updateDoc(docRef, { questions: list })
+                .then(() => {
+                    return fetchCollections();
+                })
+                .then(() => {
+                    selectCollection(selectedCollectionId);
+                })
+                .catch((err) => {
+                    showAlert("Error", err.message);
+                });
+        }
+        window.deleteQuestion = deleteQuestion;
 
-        window.openCsvModal = () => document.getElementById('csv-import-modal').classList.remove('hidden');
-        window.closeCsvModal = () => document.getElementById('csv-import-modal').classList.add('hidden');
+        function openCsvModal() {
+            document.getElementById('csv-import-modal').classList.remove('hidden');
+        }
+        window.openCsvModal = openCsvModal;
 
-        window.handleCsvUpload = function() {
+        function closeCsvModal() {
+            document.getElementById('csv-import-modal').classList.add('hidden');
+        }
+        window.closeCsvModal = closeCsvModal;
+
+        function handleCsvUpload() {
             const fileInput = document.getElementById('csv-file-input');
             const file = fileInput.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = async function(e) {
+            reader.onload = function(e) {
                 const rows = e.target.result.split('\n');
                 const parsed = [];
 
@@ -1396,19 +1443,23 @@
                     });
                 }
 
-                try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
-                    await updateDoc(docRef, { questions: arrayUnion(...parsed) });
-                    fileInput.value = '';
-                    closeCsvModal();
-                    await fetchCollections();
-                    selectCollection(selectedCollectionId);
-                } catch (err) {
-                    showAlert("Import Error", err.message);
-                }
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+                updateDoc(docRef, { questions: arrayUnion(...parsed) })
+                    .then(() => {
+                        fileInput.value = '';
+                        closeCsvModal();
+                        return fetchCollections();
+                    })
+                    .then(() => {
+                        selectCollection(selectedCollectionId);
+                    })
+                    .catch((err) => {
+                        showAlert("Import Error", err.message);
+                    });
             };
             reader.readAsText(file);
-        };
+        }
+        window.handleCsvUpload = handleCsvUpload;
 
         // --- SESSION CONTROL BUTTON BUILDER ---
         function renderControlButtons() {
@@ -1451,7 +1502,7 @@
         }
 
         // --- LOCAL RESET & SESSION TERMINATION HANDLERS ---
-        window.resetLocalGame = function() {
+        function resetLocalGame() {
             if (!confirm("Are you sure you want to reset the game? All players will return to start.")) return;
             players.forEach((p, idx) => {
                 p.position = 0;
@@ -1464,9 +1515,10 @@
             document.getElementById('dice-btn').disabled = false;
             updateTurnUI();
             logMessage("🔄 Game reset! All players are back at the start.");
-        };
+        }
+        window.resetLocalGame = resetLocalGame;
 
-        window.resetSessionGame = async function() {
+        async function resetSessionGame() {
             if (!activeRoomId) return;
             if (!confirm("Are you sure you want to reset the live session? All players will return to start.")) return;
             try {
@@ -1489,9 +1541,10 @@
             } catch (err) {
                 showAlert("Error", "Could not reset session: " + err.message);
             }
-        };
+        }
+        window.resetSessionGame = resetSessionGame;
 
-        window.endSessionGame = async function() {
+        async function endSessionGame() {
             if (!activeRoomId) return;
             if (!confirm("Are you sure you want to end this game permanently? This will delete the session on all devices.")) return;
             try {
@@ -1502,10 +1555,11 @@
             } catch (err) {
                 showAlert("Error", "Could not delete session: " + err.message);
             }
-        };
+        }
+        window.endSessionGame = endSessionGame;
 
         // --- GAMEPLAY TRIGGERS & ACTIONS ---
-        window.startLocalGame = function() {
+        function startLocalGame() {
             const activeColSelected = document.getElementById('game-collection-select').value;
             
             if (activeColSelected === 'classic') {
@@ -1556,10 +1610,11 @@
             
             // Build Controls
             renderControlButtons();
-        };
+        }
+        window.startLocalGame = startLocalGame;
 
         // --- CORE DICE ROLL ACTIONS & TRANSITIONS ---
-        window.rollDice = async function() {
+        async function rollDice() {
             if (activeRoomId) {
                 const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
                 const snap = await getDoc(roomDocRef);
@@ -1644,7 +1699,8 @@
                 await sleep(200); 
                 await checkSnakeLadderLocal(currentPlayerIndex);
             }
-        };
+        }
+        window.rollDice = rollDice;
 
         // --- REAL-TIME TRIVIA DECISION MODALS ---
         async function triggerTriviaChallenge(player, isLadder) {
@@ -1804,7 +1860,7 @@
             document.getElementById('dice-btn').disabled = false;
         }
 
-        window.quitActiveMatch = function() {
+        function quitActiveMatch() {
             if (roomUnsubscribeListener) roomUnsubscribeListener();
             document.getElementById('game-selection-panel').classList.remove('hidden');
             document.getElementById('session-lobby-panel').classList.add('hidden');
@@ -1814,7 +1870,28 @@
             
             activeRoomId = null;
             createBoard();
-        };
+        }
+        window.quitActiveMatch = quitActiveMatch;
+
+        function switchTab(tabName) {
+            const gameBtn = document.getElementById('nav-game-btn');
+            const teachBtn = document.getElementById('nav-teacher-btn');
+            const gameSec = document.getElementById('tab-game');
+            const teachSec = document.getElementById('tab-teacher');
+
+            if (tabName === 'game') {
+                gameSec.classList.remove('hidden');
+                teachSec.classList.add('hidden');
+                gameBtn.className = "px-4 py-2 rounded-lg font-semibold bg-white text-purple-900 shadow";
+                teachBtn.className = "px-4 py-2 rounded-lg font-semibold hover:bg-purple-800 text-white transition";
+            } else {
+                gameSec.classList.add('hidden');
+                teachSec.classList.remove('hidden');
+                gameBtn.className = "px-4 py-2 rounded-lg font-semibold hover:bg-purple-800 text-white transition";
+                teachBtn.className = "px-4 py-2 rounded-lg font-semibold bg-white text-purple-900 shadow";
+            }
+        }
+        window.switchTab = switchTab;
 
         // Window resize listeners to update graphics dynamically
         window.addEventListener('resize', () => {
