@@ -974,10 +974,17 @@
         let collectionsUnsubscribe = null;
 
         function subscribeToCollections() {
-            if (!currentUser || currentUser.isAnonymous) return;
+            // Safety guard to prevent active sub checks running under anonymous identities
+            if (!currentUser || currentUser.isAnonymous) {
+                dbCollections = [];
+                updateCollectionsDropdown();
+                renderCollectionsSidebar();
+                return;
+            }
+
             if (collectionsUnsubscribe) return;
 
-            // PRIVATE STORAGE BOUND TO UNIQUE TEACHER USER UID (Compliance with Rule 1)
+            // PRIVATE STORAGE BOUND TO UNIQUE TEACHER USER UID (Rule 1 Compliance)
             const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections');
             collectionsUnsubscribe = onSnapshot(colRef, (snap) => {
                 dbCollections = [];
@@ -1005,7 +1012,6 @@
 
         // --- AUTHENTICATION FLOW SETUP ---
         const initAuth = async () => {
-            // Check if there is an existing persistent session (e.g. Teacher login)
             await auth.authStateReady();
             if (auth.currentUser) return;
 
@@ -1031,7 +1037,7 @@
                 const badge = document.getElementById('teacher-status-badge');
                 if (user.isAnonymous) {
                     badge.classList.add('hidden');
-                    // Anonymous students don't subscribe to private collections
+                    // Anonymous sessions (including students) must teardown private hooks
                     if (collectionsUnsubscribe) {
                         collectionsUnsubscribe();
                         collectionsUnsubscribe = null;
@@ -1098,16 +1104,27 @@
         window.handleAnonymousLogin = handleAnonymousLogin;
 
         function handleSignOut() {
+            // TEARDOWN ACTIVE SNAPSHOT LISTENER BEFORE CLOSING AUTHENTICATION CHANNELS
+            if (collectionsUnsubscribe) {
+                collectionsUnsubscribe();
+                collectionsUnsubscribe = null;
+            }
+            dbCollections = [];
+            selectedCollectionId = null;
+
+            // Reset UI states
+            document.getElementById('collection-detail').classList.add('hidden');
+            document.getElementById('no-collection-selected').classList.remove('hidden');
+
             signOut(auth)
                 .then(() => {
-                    signInAnonymously(auth);
-                    selectedCollectionId = null;
-                    document.getElementById('collection-detail').classList.add('hidden');
-                    document.getElementById('no-collection-selected').classList.remove('hidden');
+                    return signInAnonymously(auth);
+                })
+                .then(() => {
                     showAlert("Signed Out", "Returned to Guest Portal mode.");
                 })
                 .catch((err) => {
-                    console.error(err);
+                    console.error("Sign-out process exception:", err);
                 });
         }
         window.handleSignOut = handleSignOut;
@@ -1449,6 +1466,11 @@
             const name = document.getElementById('new-collection-name').value.trim();
             if (!name) return;
 
+            if (!currentUser || currentUser.isAnonymous) {
+                showAlert("Permission Denied", "Please sign in with your email and password first to save a collection.");
+                return;
+            }
+
             const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections');
             addDoc(colRef, {
                 name: name,
@@ -1462,19 +1484,21 @@
                 showAlert("Success", `Deck "${name}" added.`, "✅");
             })
             .catch((err) => {
-                showAlert("Error", err.message);
+                showAlert("Error", "Could not create collection: " + err.message);
             });
         }
         window.submitNewCollection = submitNewCollection;
 
         function deleteCollection(colId) {
+            if (!currentUser || currentUser.isAnonymous) return;
+
             showConfirm(
                 "Delete Deck", 
                 "Are you sure you want to permanently delete this trivia deck?", 
                 () => {
                     deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', colId))
                         .catch((err) => {
-                            showAlert("Error", err.message);
+                            showAlert("Error", "Could not delete deck: " + err.message);
                         });
                 },
                 "🗑️"
@@ -1501,6 +1525,7 @@
             const correct = document.getElementById('manual-correct').value;
 
             if (!question || !a || !b || !c || !d) return;
+            if (!currentUser || currentUser.isAnonymous) return;
 
             const newCard = { question, a, b, c, d, correct };
             const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', selectedCollectionId);
@@ -1514,7 +1539,7 @@
                     closeManualQuestionModal();
                 })
                 .catch((err) => {
-                    showAlert("Error", err.message);
+                    showAlert("Error", "Could not add card: " + err.message);
                 });
         }
         window.submitManualQuestion = submitManualQuestion;
@@ -1522,6 +1547,7 @@
         function deleteQuestion(idx) {
             const colObj = dbCollections.find(c => c.id === selectedCollectionId);
             if (!colObj) return;
+            if (!currentUser || currentUser.isAnonymous) return;
 
             const list = [...colObj.questions];
             list.splice(idx, 1);
@@ -1529,7 +1555,7 @@
             const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', selectedCollectionId);
             updateDoc(docRef, { questions: list })
                 .catch((err) => {
-                    showAlert("Error", err.message);
+                    showAlert("Error", "Could not remove card: " + err.message);
                 });
         }
         window.deleteQuestion = deleteQuestion;
@@ -1548,6 +1574,7 @@
             const fileInput = document.getElementById('csv-file-input');
             const file = fileInput.files[0];
             if (!file) return;
+            if (!currentUser || currentUser.isAnonymous) return;
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -1579,7 +1606,7 @@
                         closeCsvModal();
                     })
                     .catch((err) => {
-                        showAlert("Import Error", err.message);
+                        showAlert("Import Error", "Could not append questions: " + err.message);
                     });
             };
             reader.readAsText(file);
@@ -1626,7 +1653,7 @@
             }
         }
 
-        // --- LOCAL RESET & SESSION TERMINATION HANDLERS (With custom confirms) ---
+        // --- LOCAL RESET & SESSION TERMINATION HANDLERS ---
         function resetLocalGame() {
             showConfirm(
                 "Reset Local Game",
