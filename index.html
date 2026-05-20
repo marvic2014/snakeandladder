@@ -385,8 +385,14 @@
                                 <p class="text-sm text-slate-500">Edit trivia cards or spin up a multiplayer live session</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
-                                <button onclick="hostLiveSession()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
-                                    🏁 Host Live Session
+                                <button onclick="startLocalGameFromTeacher()" class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
+                                    🖥️ Start Local
+                                </button>
+                                <button id="btn-teacher-host-session" onclick="hostLiveSession()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
+                                    🌐 Host Live
+                                </button>
+                                <button id="btn-teacher-end-session" onclick="endSessionGame()" class="hidden bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
+                                    🛑 End Session
                                 </button>
                                 <button onclick="openCsvModal()" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow transition">
                                     📥 Import CSV
@@ -493,7 +499,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, getDocs, updateDoc, arrayUnion, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, getDocs, updateDoc, arrayUnion, deleteDoc, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Provided credentials
         const firebaseConfig = {
@@ -545,6 +551,38 @@
         let gameDeck = [];
 
         // --- DECLARE LOCAL MODULE FUNCTIONS ---
+
+        function updateTeacherSessionControls() {
+            const btnHost = document.getElementById('btn-teacher-host-session');
+            const btnEnd = document.getElementById('btn-teacher-end-session');
+            if (!btnHost || !btnEnd) return;
+            
+            if (activeRoomId && currentRole === 'teacher-host') {
+                btnHost.classList.add('hidden');
+                btnEnd.classList.remove('hidden');
+            } else {
+                btnHost.classList.remove('hidden');
+                btnEnd.classList.add('hidden');
+            }
+        }
+        window.updateTeacherSessionControls = updateTeacherSessionControls;
+
+        function startLocalGameFromTeacher() {
+            if (activeRoomId) {
+                showAlert("Session Active", "Please end the current live session before starting a local game.", "🛑");
+                return;
+            }
+
+            const selectEl = document.getElementById('game-collection-select');
+            if (selectEl.querySelector(`option[value="${selectedCollectionId}"]`)) {
+                selectEl.value = selectedCollectionId;
+            }
+            
+            switchTab('game');
+            setGameMode('local');
+            startLocalGame();
+        }
+        window.startLocalGameFromTeacher = startLocalGameFromTeacher;
 
         function showAlert(title, text, icon = "ℹ️") {
             document.getElementById('alert-title').innerText = title;
@@ -897,24 +935,43 @@
         }
 
         // --- CLOUD FIREBASE ACCESS METHODS ---
-        async function fetchCollections() {
+        let collectionsUnsubscribe = null;
+
+        function subscribeToCollections() {
             if (!currentUser) return;
-            try {
-                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections');
-                const snap = await getDocs(colRef);
+            if (collectionsUnsubscribe) return;
+
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections');
+            collectionsUnsubscribe = onSnapshot(colRef, (snap) => {
                 dbCollections = [];
                 snap.forEach(d => {
                     dbCollections.push({ id: d.id, ...d.data() });
                 });
                 updateCollectionsDropdown();
                 renderCollectionsSidebar();
-            } catch (err) {
-                console.error("Error loading library collections:", err);
-            }
+
+                if (selectedCollectionId) {
+                    const activeCol = dbCollections.find(c => c.id === selectedCollectionId);
+                    if (activeCol) {
+                        document.getElementById('current-col-title').innerText = activeCol.name;
+                        renderQuestionsGrid(activeCol);
+                    } else {
+                        selectedCollectionId = null;
+                        document.getElementById('collection-detail').classList.add('hidden');
+                        document.getElementById('no-collection-selected').classList.remove('hidden');
+                    }
+                }
+            }, (err) => {
+                console.error("Collections subscription error:", err);
+            });
         }
 
         // --- AUTHENTICATION FLOW SETUP ---
         const initAuth = async () => {
+            // Check if there is an existing persistent session (e.g. Teacher login)
+            await auth.authStateReady();
+            if (auth.currentUser) return;
+
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     try {
@@ -942,9 +999,13 @@
                     badge.innerText = `Teacher: ${user.email.split('@')[0]}`;
                 }
                 updateDashboardUI();
-                fetchCollections();
+                subscribeToCollections();
             } else {
                 document.getElementById('teacher-status-badge').classList.add('hidden');
+                if (collectionsUnsubscribe) {
+                    collectionsUnsubscribe();
+                    collectionsUnsubscribe = null;
+                }
             }
         });
 
@@ -1039,6 +1100,11 @@
         }
 
         function hostLiveSession() {
+            if (activeRoomId) {
+                showAlert("Already Hosting", "You are already hosting a live session. Please end it before starting a new one.", "🛑");
+                return;
+            }
+
             if (!currentUser || currentUser.isAnonymous) {
                 showAlert("Authentication Required", "Please log in with email and password to host multiplayer matches.", "🔒");
                 return;
@@ -1070,6 +1136,7 @@
 
                 currentRole = 'teacher-host';
                 activeRoomId = roomCode;
+                updateTeacherSessionControls();
                 
                 const lobby = document.getElementById('session-lobby-panel');
                 const startBtnExists = document.getElementById('btn-lobby-host-start');
@@ -1291,6 +1358,37 @@
         }
         window.selectCollection = selectCollection;
 
+        function renderQuestionsGrid(colObj) {
+            const listEl = document.getElementById('questions-grid-list');
+            const countEl = document.getElementById('total-questions-count');
+            listEl.innerHTML = '';
+
+            const list = colObj.questions || [];
+            countEl.innerText = `Questions (${list.length})`;
+
+            if (list.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-8 text-slate-400 text-sm">This deck has no questions. Manually add some cards or upload a CSV file!</div>`;
+                return;
+            }
+
+            list.forEach((q, idx) => {
+                listEl.innerHTML += `
+                    <div class="p-4 rounded-lg bg-slate-50 border border-slate-200 relative">
+                        <button onclick="deleteQuestion(${idx})" class="absolute top-3 right-3 text-sm hover:scale-110 transition text-red-600">❌</button>
+                        <span class="text-xs font-bold text-purple-900 bg-purple-100 px-2 py-0.5 rounded">Card ${idx + 1}</span>
+                        <p class="font-bold text-slate-800 mt-1 mb-2 text-sm">${q.question}</p>
+                        <div class="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                            <div class="${q.correct === 'A' ? 'font-bold text-emerald-600' : ''}">A: ${q.a}</div>
+                            <div class="${q.correct === 'B' ? 'font-bold text-emerald-600' : ''}">B: ${q.b}</div>
+                            <div class="${q.correct === 'C' ? 'font-bold text-emerald-600' : ''}">C: ${q.c}</div>
+                            <div class="${q.correct === 'D' ? 'font-bold text-emerald-600' : ''}">D: ${q.d}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        window.renderQuestionsGrid = renderQuestionsGrid;
+
         // --- DASHBOARD WRITES (Rule 1) ---
         function openCreateCollectionModal() {
             document.getElementById('create-collection-modal').classList.remove('hidden');
@@ -1306,18 +1404,15 @@
             const name = document.getElementById('new-collection-name').value.trim();
             if (!name) return;
 
-            const docRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections'));
-            setDoc(docRef, {
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections');
+            addDoc(colRef, {
                 name: name,
                 teacherId: currentUser.uid,
                 questions: []
             })
-            .then(() => {
+            .then((docRef) => {
                 document.getElementById('new-collection-name').value = '';
                 closeCreateCollectionModal();
-                return fetchCollections();
-            })
-            .then(() => {
                 selectCollection(docRef.id);
                 showAlert("Success", `Deck "${name}" added.`, "✅");
             })
@@ -1330,12 +1425,6 @@
         function deleteCollection(colId) {
             if (!confirm("Delete this deck permanently?")) return;
             deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', colId))
-                .then(() => {
-                    selectedCollectionId = null;
-                    document.getElementById('collection-detail').classList.add('hidden');
-                    document.getElementById('no-collection-selected').classList.remove('hidden');
-                    return fetchCollections();
-                })
                 .catch((err) => {
                     showAlert("Error", err.message);
                 });
@@ -1371,12 +1460,7 @@
                     document.getElementById('manual-b').value = '';
                     document.getElementById('manual-c').value = '';
                     document.getElementById('manual-d').value = '';
-
                     closeManualQuestionModal();
-                    return fetchCollections();
-                })
-                .then(() => {
-                    selectCollection(selectedCollectionId);
                 })
                 .catch((err) => {
                     showAlert("Error", err.message);
@@ -1393,12 +1477,6 @@
 
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
             updateDoc(docRef, { questions: list })
-                .then(() => {
-                    return fetchCollections();
-                })
-                .then(() => {
-                    selectCollection(selectedCollectionId);
-                })
                 .catch((err) => {
                     showAlert("Error", err.message);
                 });
@@ -1448,10 +1526,6 @@
                     .then(() => {
                         fileInput.value = '';
                         closeCsvModal();
-                        return fetchCollections();
-                    })
-                    .then(() => {
-                        selectCollection(selectedCollectionId);
                     })
                     .catch((err) => {
                         showAlert("Import Error", err.message);
@@ -1870,6 +1944,7 @@
             
             activeRoomId = null;
             createBoard();
+            updateTeacherSessionControls();
         }
         window.quitActiveMatch = quitActiveMatch;
 
