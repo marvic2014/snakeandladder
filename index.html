@@ -1834,30 +1834,39 @@
                 // Deep clone to guarantee Firestore detects the state change
                 let activePlayer = { ...rData.players[rData.currentPlayerIndex] };
                 let oldPos = activePlayer.position;
-                let newPos = oldPos + roll;
-
-                let updatedPlayersArray = [...rData.players];
+                let calculatedTarget = oldPos + roll;
                 let logs = [...rData.logEvents];
 
                 logs.unshift(`🎲 <b>${activePlayer.name}</b> rolled a ${roll}.`);
 
-                if (newPos > 100) {
-                    logs.unshift(`🛑 <b>${activePlayer.name}</b> needs an exact roll to hit tile 100.`);
-                    const nextIdx = (rData.currentPlayerIndex + 1) % rData.players.length;
-                    
-                    await updateDoc(roomDocRef, {
-                        diceResult: `🎲 ${roll}`,
-                        currentPlayerIndex: nextIdx,
-                        logEvents: logs
-                    });
-                    return;
+                let pathSequence = [];
+                // Calculate bounce-back path
+                if (calculatedTarget > 100) {
+                    let excess = calculatedTarget - 100;
+                    let bounceBackTarget = 100 - excess;
+                    logs.unshift(`↩️ <b>${activePlayer.name}</b> bounced back ${excess} space(s) from tile 100.`);
+
+                    // Forward steps up to 100
+                    for (let p = oldPos + 1; p <= 100; p++) {
+                        pathSequence.push(p);
+                    }
+                    // Backward steps down from 100
+                    for (let p = 99; p >= bounceBackTarget; p--) {
+                        pathSequence.push(p);
+                    }
+                    activePlayer.position = bounceBackTarget;
+                } else {
+                    for (let p = oldPos + 1; p <= calculatedTarget; p++) {
+                        pathSequence.push(p);
+                    }
+                    activePlayer.position = calculatedTarget;
                 }
 
                 // Step-by-step visual hopping animation locally before pushing state
-                for (let step = 0; step < roll; step++) {
-                    activePlayer.position += 1;
+                for (let step = 0; step < pathSequence.length; step++) {
+                    let currentStepPosition = pathSequence[step];
                     if (players[rData.currentPlayerIndex]) {
-                        players[rData.currentPlayerIndex].position = activePlayer.position;
+                        players[rData.currentPlayerIndex].position = currentStepPosition;
                         players[rData.currentPlayerIndex].element.classList.add('hopping');
                         updateTokenPosition(rData.currentPlayerIndex);
                     }
@@ -1868,6 +1877,7 @@
                     await sleep(150);
                 }
 
+                let updatedPlayersArray = [...rData.players];
                 updatedPlayersArray[rData.currentPlayerIndex] = activePlayer;
 
                 await updateDoc(roomDocRef, {
@@ -1893,25 +1903,44 @@
                 document.getElementById('dice-result').innerText = `🎲 ${roll}`;
                 
                 let player = players[currentPlayerIndex];
+                let oldPos = player.position;
+                let calculatedTarget = oldPos + roll;
                 
-                if (player.position + roll > 100) {
-                    logMessage(`🛑 <b>${player.name}</b> rolled a ${roll} but needs an exact roll to hit 100!`);
-                    await sleep(1500);
-                    nextTurn();
-                    return;
-                }
-
                 logMessage(`▶️ <b>${player.name}</b> rolled a ${roll}.`);
+
+                let pathSequence = [];
+                if (calculatedTarget > 100) {
+                    let excess = calculatedTarget - 100;
+                    let bounceBackTarget = 100 - excess;
+                    logMessage(`↩️ <b>${player.name}</b> bounced back ${excess} space(s) from tile 100.`);
+
+                    for (let p = oldPos + 1; p <= 100; p++) {
+                        pathSequence.push(p);
+                    }
+                    for (let p = 99; p >= bounceBackTarget; p--) {
+                        pathSequence.push(p);
+                    }
+                    player.position = bounceBackTarget;
+                } else {
+                    for (let p = oldPos + 1; p <= calculatedTarget; p++) {
+                        pathSequence.push(p);
+                    }
+                    player.position = calculatedTarget;
+                }
                 
                 // Physical hopping animation for local mode
-                for (let step = 0; step < roll; step++) {
-                    player.position += 1;
+                for (let step = 0; step < pathSequence.length; step++) {
+                    let currentStepPosition = pathSequence[step];
+                    player.position = currentStepPosition;
                     player.element.classList.add('hopping');
                     updateTokenPosition(currentPlayerIndex);
                     await sleep(150);
                     player.element.classList.remove('hopping');
                     await sleep(150);
                 }
+
+                // Reinforce final position in state
+                updateTokenPosition(currentPlayerIndex);
 
                 await sleep(100); 
                 await checkSnakeLadderLocal(currentPlayerIndex);
