@@ -165,6 +165,23 @@
             </div>
         </div>
 
+        <!-- Custom Confirm Modal (Replaces unsafe window.confirm) -->
+        <div id="custom-confirm" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-center transform scale-95 transition-all">
+                <span id="confirm-icon" class="text-5xl block mb-2">❓</span>
+                <h3 id="confirm-title" class="text-lg font-bold text-slate-900 mb-2">Confirm Action</h3>
+                <p id="confirm-text" class="text-slate-600 mb-6"></p>
+                <div class="flex gap-3">
+                    <button id="confirm-cancel-btn" class="w-1/2 bg-slate-200 text-slate-800 font-semibold py-2.5 rounded-lg hover:bg-slate-300 transition">
+                        Cancel
+                    </button>
+                    <button id="confirm-ok-btn" class="w-1/2 bg-red-600 text-white font-semibold py-2.5 rounded-lg hover:bg-red-700 transition">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Trivia Question Overlay -->
         <div id="trivia-modal" class="fixed inset-0 bg-black/75 z-40 flex items-center justify-center p-4 hidden">
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 md:p-8 border-4 border-purple-950">
@@ -597,6 +614,25 @@
         }
         window.closeAlert = closeAlert;
 
+        function showConfirm(title, text, onConfirm, icon = "❓") {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-text').innerText = text;
+            document.getElementById('confirm-icon').innerText = icon;
+            
+            const modal = document.getElementById('custom-confirm');
+            modal.classList.remove('hidden');
+            
+            document.getElementById('confirm-cancel-btn').onclick = () => {
+                modal.classList.add('hidden');
+            };
+            
+            document.getElementById('confirm-ok-btn').onclick = () => {
+                modal.classList.add('hidden');
+                onConfirm();
+            };
+        }
+        window.showConfirm = showConfirm;
+
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         function createBoard() {
@@ -938,10 +974,11 @@
         let collectionsUnsubscribe = null;
 
         function subscribeToCollections() {
-            if (!currentUser) return;
+            if (!currentUser || currentUser.isAnonymous) return;
             if (collectionsUnsubscribe) return;
 
-            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections');
+            // PRIVATE STORAGE BOUND TO UNIQUE TEACHER USER UID (Compliance with Rule 1)
+            const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections');
             collectionsUnsubscribe = onSnapshot(colRef, (snap) => {
                 dbCollections = [];
                 snap.forEach(d => {
@@ -994,12 +1031,20 @@
                 const badge = document.getElementById('teacher-status-badge');
                 if (user.isAnonymous) {
                     badge.classList.add('hidden');
+                    // Anonymous students don't subscribe to private collections
+                    if (collectionsUnsubscribe) {
+                        collectionsUnsubscribe();
+                        collectionsUnsubscribe = null;
+                    }
+                    dbCollections = [];
+                    updateCollectionsDropdown();
+                    renderCollectionsSidebar();
                 } else {
                     badge.classList.remove('hidden');
                     badge.innerText = `Teacher: ${user.email.split('@')[0]}`;
+                    updateDashboardUI();
+                    subscribeToCollections();
                 }
-                updateDashboardUI();
-                subscribeToCollections();
             } else {
                 document.getElementById('teacher-status-badge').classList.add('hidden');
                 if (collectionsUnsubscribe) {
@@ -1389,7 +1434,7 @@
         }
         window.renderQuestionsGrid = renderQuestionsGrid;
 
-        // --- DASHBOARD WRITES (Rule 1) ---
+        // --- DASHBOARD WRITES (Rule 1 / Path isolation for authenticated user uid) ---
         function openCreateCollectionModal() {
             document.getElementById('create-collection-modal').classList.remove('hidden');
         }
@@ -1404,7 +1449,7 @@
             const name = document.getElementById('new-collection-name').value.trim();
             if (!name) return;
 
-            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections');
+            const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections');
             addDoc(colRef, {
                 name: name,
                 teacherId: currentUser.uid,
@@ -1423,11 +1468,17 @@
         window.submitNewCollection = submitNewCollection;
 
         function deleteCollection(colId) {
-            if (!confirm("Delete this deck permanently?")) return;
-            deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', colId))
-                .catch((err) => {
-                    showAlert("Error", err.message);
-                });
+            showConfirm(
+                "Delete Deck", 
+                "Are you sure you want to permanently delete this trivia deck?", 
+                () => {
+                    deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', colId))
+                        .catch((err) => {
+                            showAlert("Error", err.message);
+                        });
+                },
+                "🗑️"
+            );
         }
         window.deleteCollection = deleteCollection;
 
@@ -1452,7 +1503,7 @@
             if (!question || !a || !b || !c || !d) return;
 
             const newCard = { question, a, b, c, d, correct };
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', selectedCollectionId);
             updateDoc(docRef, { questions: arrayUnion(newCard) })
                 .then(() => {
                     document.getElementById('manual-prompt').value = '';
@@ -1475,7 +1526,7 @@
             const list = [...colObj.questions];
             list.splice(idx, 1);
 
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', selectedCollectionId);
             updateDoc(docRef, { questions: list })
                 .catch((err) => {
                     showAlert("Error", err.message);
@@ -1521,7 +1572,7 @@
                     });
                 }
 
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+                const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', selectedCollectionId);
                 updateDoc(docRef, { questions: arrayUnion(...parsed) })
                     .then(() => {
                         fileInput.value = '';
@@ -1575,60 +1626,75 @@
             }
         }
 
-        // --- LOCAL RESET & SESSION TERMINATION HANDLERS ---
+        // --- LOCAL RESET & SESSION TERMINATION HANDLERS (With custom confirms) ---
         function resetLocalGame() {
-            if (!confirm("Are you sure you want to reset the game? All players will return to start.")) return;
-            players.forEach((p, idx) => {
-                p.position = 0;
-                updateTokenPosition(idx);
-            });
-            currentPlayerIndex = 0;
-            gameActive = true;
-            document.getElementById('dice-result').innerText = '-';
-            document.getElementById('game-log').innerHTML = '';
-            document.getElementById('dice-btn').disabled = false;
-            updateTurnUI();
-            logMessage("🔄 Game reset! All players are back at the start.");
+            showConfirm(
+                "Reset Local Game",
+                "Are you sure you want to reset the game? All players will return to start.",
+                () => {
+                    players.forEach((p, idx) => {
+                        p.position = 0;
+                        updateTokenPosition(idx);
+                    });
+                    currentPlayerIndex = 0;
+                    gameActive = true;
+                    document.getElementById('dice-result').innerText = '-';
+                    document.getElementById('game-log').innerHTML = '';
+                    document.getElementById('dice-btn').disabled = false;
+                    updateTurnUI();
+                    logMessage("🔄 Game reset! All players are back at the start.");
+                }
+            );
         }
         window.resetLocalGame = resetLocalGame;
 
         async function resetSessionGame() {
             if (!activeRoomId) return;
-            if (!confirm("Are you sure you want to reset the live session? All players will return to start.")) return;
-            try {
-                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
-                const snap = await getDoc(roomDocRef);
-                if (snap.exists()) {
-                    const rData = snap.data();
-                    const resetPlayers = rData.players.map(p => ({
-                        ...p,
-                        position: 0
-                    }));
-                    await updateDoc(roomDocRef, {
-                        players: resetPlayers,
-                        currentPlayerIndex: 0,
-                        diceResult: '-',
-                        status: 'playing', 
-                        logEvents: ['🔄 Host reset the session! All players are back at start.']
-                    });
+            showConfirm(
+                "Reset Room",
+                "Are you sure you want to reset the live session? All players will return to start.",
+                async () => {
+                    try {
+                        const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
+                        const snap = await getDoc(roomDocRef);
+                        if (snap.exists()) {
+                            const rData = snap.data();
+                            const resetPlayers = rData.players.map(p => ({
+                                ...p,
+                                position: 0
+                            }));
+                            await updateDoc(roomDocRef, {
+                                players: resetPlayers,
+                                currentPlayerIndex: 0,
+                                diceResult: '-',
+                                status: 'playing', 
+                                logEvents: ['🔄 Host reset the session! All players are back at start.']
+                            });
+                        }
+                    } catch (err) {
+                        showAlert("Error", "Could not reset session: " + err.message);
+                    }
                 }
-            } catch (err) {
-                showAlert("Error", "Could not reset session: " + err.message);
-            }
+            );
         }
         window.resetSessionGame = resetSessionGame;
 
         async function endSessionGame() {
             if (!activeRoomId) return;
-            if (!confirm("Are you sure you want to end this game permanently? This will delete the session on all devices.")) return;
-            try {
-                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
-                await deleteDoc(roomDocRef);
-                quitActiveMatch();
-                showAlert("Session Deleted", "The live room session was terminated.");
-            } catch (err) {
-                showAlert("Error", "Could not delete session: " + err.message);
-            }
+            showConfirm(
+                "End Session",
+                "Are you sure you want to end this game permanently? This will delete the session on all devices.",
+                async () => {
+                    try {
+                        const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
+                        await deleteDoc(roomDocRef);
+                        quitActiveMatch();
+                        showAlert("Session Deleted", "The live room session was terminated.");
+                    } catch (err) {
+                        showAlert("Error", "Could not delete session: " + err.message);
+                    }
+                }
+            );
         }
         window.endSessionGame = endSessionGame;
 
