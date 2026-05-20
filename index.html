@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Classroom Snakes & Ladders</title>
+    <title>Educational Snakes & Ladders Live</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
             --primary: #4a148c;
@@ -14,403 +16,1786 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
 
-        h1 {
-            color: var(--primary);
-            margin-bottom: 10px;
-        }
-
-        .container {
-            display: flex;
-            gap: 30px;
-            max-width: 1200px;
-            width: 100%;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        /* Setup & Controls Panel */
-        .controls-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 300px;
-            height: fit-content;
-        }
-
-        .setup-group, .game-play {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        input, select, button {
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            font-size: 16px;
-        }
-
-        button {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
-        }
-
-        button:hover {
-            background-color: #7c43bd;
-        }
-
-        #dice-btn {
-            background-color: #ff6d00;
-            font-size: 20px;
-            padding: 15px;
-        }
-
-        #dice-btn:hover {
-            background-color: #ffab40;
-        }
-
-        /* The Board */
+        /* Responsive board setup */
         .board-container {
             position: relative;
-            background: white;
+            background: #e0f2f1;
             padding: 10px;
             border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         }
 
         #board {
             display: grid;
             grid-template-columns: repeat(10, 60px);
             grid-template-rows: repeat(10, 60px);
-            border: 2px solid #333;
+            border: 3px solid #004d40;
+            position: relative;
+            background-color: #fff;
+        }
+
+        @media (max-width: 640px) {
+            #board {
+                grid-template-columns: repeat(10, 32px);
+                grid-template-rows: repeat(10, 32px);
+                border-width: 2px;
+            }
+            .board-container {
+                padding: 5px;
+            }
         }
 
         .cell {
-            border: 1px solid #ddd;
+            border: 1px solid #b2dfdb;
             display: flex;
             align-items: flex-start;
             justify-content: flex-start;
             padding: 4px;
             font-weight: bold;
-            font-size: 12px;
-            position: relative;
+            font-size: 13px;
             box-sizing: border-box;
+            color: #004d40;
+            opacity: 0.85;
         }
 
-        /* Dynamic board cell colors */
-        .cell:nth-child(4n) { background-color: #ffebeb; }
-        .cell:nth-child(4n+1) { background-color: #e6f7ff; }
-        .cell:nth-child(4n+2) { background-color: #f6ffed; }
-        .cell:nth-child(4n+3) { background-color: #fff7e6; }
+        @media (max-width: 640px) {
+            .cell {
+                font-size: 8px;
+                padding: 1px;
+            }
+        }
 
-        /* Canvas overlay for drawing snakes and ladders */
+        /* Distinct colors for board grid */
+        .cell:nth-child(4n) { background-color: #fff8e1; }
+        .cell:nth-child(4n+1) { background-color: #e0f2f1; }
+        .cell:nth-child(4n+2) { background-color: #e8f5e9; }
+        .cell:nth-child(4n+3) { background-color: #efebe9; }
+
         #board-canvas {
             position: absolute;
             top: 10px;
             left: 10px;
             pointer-events: none;
-            z-index: 1;
+            z-index: 5;
         }
 
-        /* Token container inside cells */
-        .token-container {
-            position: absolute;
-            bottom: 4px;
-            right: 4px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2px;
-            max-width: 50px;
-            z-index: 2;
+        @media (max-width: 640px) {
+            #board-canvas {
+                top: 5px;
+                left: 5px;
+            }
         }
 
+        /* Responsive Player Chips */
         .token {
-            width: 14px;
-            height: 14px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
             border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            display: inline-block;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            position: absolute;
+            z-index: 10;
+            transition: top 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
+            transform: translate(-50%, -50%);
+            pointer-events: none;
         }
 
-        /* Game Status */
-        .status-box {
-            margin-top: 15px;
-            padding: 10px;
-            background: #eee;
-            border-radius: 6px;
-            font-weight: bold;
-            text-align: center;
+        @media (max-width: 640px) {
+            .token {
+                width: 12px;
+                height: 12px;
+                border-width: 1px;
+            }
         }
 
-        .log {
-            margin-top: 10px;
-            max-height: 150px;
-            overflow-y: auto;
-            font-size: 14px;
-            border-top: 1px solid #ddd;
-            padding-top: 10px;
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
     </style>
 </head>
-<body>
+<body class="bg-slate-100 min-h-screen text-slate-800">
 
-    <h1>Classroom Snakes & Ladders 🎲</h1>
-
-    <div class="container">
-        <div class="controls-panel">
-            <div id="setup-area" class="setup-group">
-                <h3>Game Setup</h3>
-                <label for="player-count">How many students?</label>
-                <select id="player-count" onchange="generatePlayerInputs()">
-                    <option value="2">2 Players</option>
-                    <option value="3">3 Players</option>
-                    <option value="4">4 Players</option>
-                    <option value="5">5 Players</option>
-                    <option value="6">6 Players</option>
-                </select>
-                <div id="player-names-inputs"></div>
-                <button onclick="startGame()">Start Game</button>
+    <!-- Header Navigation -->
+    <header class="bg-purple-950 text-white shadow-lg px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">🎲</span>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Snakes & Ladders Live</h1>
+                <p class="text-xs text-purple-200">Interactive Classroom Game Lounge</p>
             </div>
+        </div>
+        <nav class="flex items-center gap-2">
+            <button id="nav-game-btn" onclick="switchTab('game')" class="px-4 py-2 rounded-lg font-semibold bg-white text-purple-900 shadow">
+                🎮 Play Game
+            </button>
+            <button id="nav-teacher-btn" onclick="switchTab('teacher')" class="px-4 py-2 rounded-lg font-semibold hover:bg-purple-800 transition">
+                👨‍🏫 Teacher Portal
+            </button>
+            <span id="teacher-status-badge" class="hidden bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-full font-bold ml-2">
+                Teacher Online
+            </span>
+        </nav>
+    </header>
 
-            <div id="game-area" class="game-play" style="display: none;">
-                <div class="status-box" id="current-turn"> Turn: Player 1</div>
-                <button id="dice-btn" onclick="rollDice()">🎲 Roll Dice</button>
-                <div id="dice-result" style="text-align:center; font-size: 24px; font-weight:bold;">-</div>
-                <div class="log" id="game-log"></div>
-                <button onclick="resetGame()" style="background-color: #c62828;">Reset Game</button>
+    <!-- App Wrapper -->
+    <main class="max-w-7xl mx-auto p-4 md:p-6">
+
+        <!-- Custom Notification Alert Modal replacement (No Alerts Guardrail) -->
+        <div id="custom-alert" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-center transform scale-95 transition-all">
+                <span id="alert-icon" class="text-5xl block mb-2">ℹ️</span>
+                <h3 id="alert-title" class="text-lg font-bold text-slate-900 mb-2">Notice</h3>
+                <p id="alert-text" class="text-slate-600 mb-6"></p>
+                <button onclick="closeAlert()" class="w-full bg-purple-950 text-white font-semibold py-2.5 rounded-lg hover:bg-purple-900 transition">
+                    OK
+                </button>
             </div>
         </div>
 
-        <div class="board-container">
-            <div id="board"></div>
-            <canvas id="board-canvas" width="600" height="600"></canvas>
+        <!-- Trivia Question Overlay -->
+        <div id="trivia-modal" class="fixed inset-0 bg-black/75 z-40 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 md:p-8 border-4 border-purple-950">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <span id="trivia-type-badge" class="bg-purple-100 text-purple-950 font-bold px-3 py-1 rounded-full text-sm">
+                        LADDER CHALLENGE!
+                    </span>
+                    <div class="text-amber-600 font-bold text-lg flex items-center gap-1">
+                        ⏱️ <span id="timer-sec">15</span>s
+                    </div>
+                </div>
+                <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1" id="trivia-player-name">Student's Turn</h3>
+                <h2 class="text-xl md:text-2xl font-bold text-slate-800 mb-6 leading-snug" id="trivia-question-text">
+                    What is 5 + 5?
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="trivia-options-container">
+                    <!-- Dynamic choices -->
+                </div>
+            </div>
         </div>
-    </div>
 
-    <script>
-        // Board logic maps
+        <!-- TAB 1: GAMEPLAY SECTION -->
+        <section id="tab-game" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Side Panel configurations -->
+            <div class="lg:col-span-4 flex flex-col gap-6">
+                
+                <!-- Game Type Selection Hub -->
+                <div id="game-selection-panel" class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">🕹️ Match Type</h2>
+                    <p class="text-xs text-slate-500 mb-4">Choose how students will participate in this session.</p>
+                    
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <button id="btn-local-mode" onclick="setGameMode('local')" class="p-3 rounded-lg border-2 border-purple-950 bg-purple-50 text-purple-950 font-bold text-sm transition">
+                            🖥️ Local Game<br><span class="text-[10px] font-normal text-slate-500">All-on-one-device</span>
+                        </button>
+                        <button id="btn-session-mode" onclick="setGameMode('session')" class="p-3 rounded-lg border-2 border-slate-200 hover:border-purple-300 text-slate-600 font-bold text-sm transition">
+                            🌐 Live Session<br><span class="text-[10px] font-normal text-slate-500">Multi-device join</span>
+                        </button>
+                    </div>
+
+                    <!-- Setup Form - Local Mode -->
+                    <div id="panel-setup-local" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Select Question Deck:</label>
+                            <select id="game-collection-select" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500">
+                                <option value="classic">Classic (No Questions)</option>
+                                <option value="default-math">Default Math Flashcards</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">How many players?</label>
+                            <select id="player-count" onchange="generatePlayerInputs()" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500">
+                                <option value="2">2 Players</option>
+                                <option value="3">3 Players</option>
+                                <option value="4">4 Players</option>
+                                <option value="5">5 Players</option>
+                                <option value="6" selected>6 Players</option>
+                            </select>
+                        </div>
+                        <div id="player-names-inputs" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1"></div>
+                        <button onclick="startLocalGame()" class="w-full bg-purple-950 hover:bg-purple-900 text-white font-bold py-3 rounded-lg transition-all">
+                            🏁 Start Local Game
+                        </button>
+                    </div>
+
+                    <!-- Join Form - Session Mode -->
+                    <div id="panel-setup-session" class="space-y-4 hidden">
+                        <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-lg">
+                            <p class="text-xs text-indigo-950">Enter the 4-digit session code provided by your teacher to connect your device.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Session Code</label>
+                            <input type="text" id="join-session-code" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500 uppercase font-mono tracking-wider text-center text-lg" placeholder="ABCD">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Your Name</label>
+                            <input type="text" id="join-player-name" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500" placeholder="e.g. Charlie">
+                        </div>
+                        <button onclick="joinLiveSession()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition-all">
+                            🔗 Connect Device
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lobby View - Waiting for host to start -->
+                <div id="session-lobby-panel" class="bg-white rounded-xl shadow p-5 hidden">
+                    <h2 class="font-extrabold text-lg text-slate-900 mb-2 flex items-center justify-between">
+                        <span>⌛ Room Lobby</span>
+                        <span id="lobby-code-badge" class="bg-purple-100 text-purple-950 px-3 py-1 rounded-full font-mono text-sm">CODE</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mb-4">Wait here. The match starts when the teacher presses start.</p>
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Players Connected</h3>
+                        <div id="lobby-players-list" class="flex flex-col gap-2 max-h-48 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <!-- Live Gameplay Interactive panel -->
+                <div id="game-active-panel" class="bg-white rounded-xl shadow p-5 hidden">
+                    <h2 class="text-lg font-bold text-slate-900 mb-4 border-b pb-2 flex justify-between items-center">
+                        <span>🎮 Game Panel</span>
+                        <span id="session-id-indicator" class="hidden text-xs font-mono bg-purple-100 text-purple-950 px-2 py-0.5 rounded"></span>
+                    </h2>
+                    
+                    <div class="flex flex-col gap-4">
+                        <div id="current-turn" class="status-box p-3 rounded-lg font-bold text-lg text-center bg-slate-100 border-l-4 border-slate-400">
+                            Loading turn order...
+                        </div>
+
+                        <button id="dice-btn" onclick="rollDice()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 disabled:opacity-50">
+                            <span>🎲 Roll Dice</span>
+                        </button>
+
+                        <div id="dice-result" class="text-center font-extrabold text-slate-800 text-4xl py-2 min-h-[50px]">-</div>
+
+                        <div>
+                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Activity Log</h3>
+                            <div class="log custom-scroll bg-slate-50 border rounded-lg p-3 h-44 overflow-y-auto" id="game-log"></div>
+                        </div>
+
+                        <!-- Dynamic Control Buttons Injection area -->
+                        <div id="dynamic-action-controls" class="space-y-2 mt-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right side Canvas Gameboard -->
+            <div class="lg:col-span-8 flex justify-center items-start">
+                <div class="board-container">
+                    <div id="board"></div>
+                    <canvas id="board-canvas" width="600" height="600"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: TEACHER DASHBOARD PORTAL -->
+        <section id="tab-teacher" class="hidden">
+            <!-- Auth Form Card -->
+            <div id="teacher-auth-card" class="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-6 md:p-8 mt-6">
+                <div class="text-center mb-6">
+                    <span class="text-5xl block mb-2">👨‍🏫</span>
+                    <h2 class="text-2xl font-extrabold text-slate-800">Teacher Login Portal</h2>
+                    <p class="text-sm text-slate-500 mt-1">Manage trivia decks and host multiplayer matches</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Email Address</label>
+                        <input type="email" id="teacher-email" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500" placeholder="teacher@school.edu">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Password</label>
+                        <input type="password" id="teacher-password" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500" placeholder="••••••••">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 pt-2">
+                        <button onclick="handleTeacherLogin()" class="bg-purple-950 hover:bg-purple-905 text-white font-semibold py-2.5 rounded-lg transition shadow-md">
+                            Sign In
+                        </button>
+                        <button onclick="handleTeacherRegister()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-2.5 rounded-lg transition">
+                            Register Account
+                        </button>
+                    </div>
+
+                    <div class="relative flex py-3 items-center">
+                        <div class="flex-grow border-t border-slate-300"></div>
+                        <span class="flex-shrink mx-4 text-slate-400 text-xs uppercase">or</span>
+                        <div class="flex-grow border-t border-slate-300"></div>
+                    </div>
+
+                    <button onclick="handleAnonymousLogin()" class="w-full bg-slate-700 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-lg transition shadow">
+                        Guest Portal
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dashboard Portal Panels -->
+            <div id="teacher-dashboard" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 mt-4">
+                
+                <!-- Deck Library -->
+                <div class="lg:col-span-4 bg-white rounded-xl shadow p-5">
+                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                        <h2 class="font-bold text-lg text-slate-900">📚 Custom Decks</h2>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openCreateCollectionModal()" class="text-xs bg-purple-950 hover:bg-purple-900 text-white px-2.5 py-1.5 rounded font-bold transition">
+                                + Create
+                            </button>
+                            <button onclick="handleSignOut()" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 rounded font-bold transition">
+                                🚪 Logout
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="collections-list" class="flex flex-col gap-2 max-h-[500px] overflow-y-auto pr-1"></div>
+
+                    <div class="mt-6 pt-4 border-t border-slate-200">
+                        <button onclick="handleSignOut()" class="w-full bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold py-2 rounded-lg transition">
+                            🚪 Sign Out / Logout
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Collection editor or active hosting setup -->
+                <div class="lg:col-span-8 flex flex-col gap-6">
+                    <div id="no-collection-selected" class="bg-white rounded-xl shadow p-12 text-center text-slate-500">
+                        <span class="text-5xl block mb-2">📁</span>
+                        <h3 class="text-lg font-bold">No Deck Selected</h3>
+                        <p class="text-sm">Choose or create a custom trivia deck in the sidebar library to begin editing or hosting live sessions.</p>
+                    </div>
+
+                    <!-- Selected Deck view -->
+                    <div id="collection-detail" class="bg-white rounded-xl shadow p-6 hidden">
+                        <div class="flex flex-wrap justify-between items-center gap-4 border-b pb-4 mb-4">
+                            <div>
+                                <h2 class="text-2xl font-extrabold text-slate-900" id="current-col-title">Deck Title</h2>
+                                <p class="text-sm text-slate-500">Edit trivia cards or spin up a multiplayer live session</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="hostLiveSession()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
+                                    🏁 Host Live Session
+                                </button>
+                                <button onclick="openCsvModal()" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow transition">
+                                    📥 Import CSV
+                                </button>
+                                <button onclick="openManualQuestionModal()" class="bg-purple-950 hover:bg-purple-900 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow transition">
+                                    ✍️ Add Question
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card Grid -->
+                        <div>
+                            <h3 class="font-bold text-slate-800 mb-3" id="total-questions-count">Questions (0)</h3>
+                            <div id="questions-grid-list" class="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MODAL: DECK CREATOR -->
+        <div id="create-collection-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                <h3 class="text-lg font-bold text-slate-900 mb-4">Create New Deck</h3>
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Deck Title</label>
+                    <input type="text" id="new-collection-name" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500" placeholder="e.g. Science Bowl Trivia">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button onclick="closeCreateCollectionModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg transition font-semibold">Cancel</button>
+                    <button onclick="submitNewCollection()" class="bg-purple-950 hover:bg-purple-900 text-white px-4 py-2 rounded-lg transition font-semibold">Create</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: CARD CREATOR -->
+        <div id="manual-question-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+                <h3 class="text-lg font-bold text-slate-900 mb-4">Add Trivia Card</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Question</label>
+                        <input type="text" id="manual-prompt" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500" placeholder="Which gas do plants absorb?">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Option A</label>
+                            <input type="text" id="manual-a" class="w-full p-2 rounded-lg border border-slate-300 focus:ring-1 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Option B</label>
+                            <input type="text" id="manual-b" class="w-full p-2 rounded-lg border border-slate-300 focus:ring-1 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Option C</label>
+                            <input type="text" id="manual-c" class="w-full p-2 rounded-lg border border-slate-300 focus:ring-1 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Option D</label>
+                            <input type="text" id="manual-d" class="w-full p-2 rounded-lg border border-slate-300 focus:ring-1 focus:ring-purple-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Correct Answer Choice</label>
+                        <select id="manual-correct" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500">
+                            <option value="A">Option A</option>
+                            <option value="B">Option B</option>
+                            <option value="C">Option C</option>
+                            <option value="D">Option D</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button onclick="closeManualQuestionModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg transition font-semibold">Cancel</button>
+                    <button onclick="submitManualQuestion()" class="bg-purple-950 hover:bg-purple-900 text-white px-4 py-2 rounded-lg transition font-semibold">Save Card</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: CSV IMPORTER -->
+        <div id="csv-import-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                <h3 class="text-lg font-bold text-slate-900 mb-2">Import Questions via CSV</h3>
+                <p class="text-xs text-slate-500 mb-4">
+                    Must match format with exact headers: <br>
+                    <code class="block bg-slate-100 p-2 rounded mt-1 overflow-x-auto text-[11px] text-purple-950 font-mono">
+                        Question,Option A,Option B,Option C,Option D,Correct (A/B/C/D)
+                    </code>
+                </p>
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-slate-600 mb-2">Select CSV File</label>
+                    <input type="file" id="csv-file-input" accept=".csv" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button onclick="closeCsvModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg transition font-semibold">Cancel</button>
+                    <button onclick="handleCsvUpload()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition font-semibold">Import Cards</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Firebase v11 SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, getDocs, updateDoc, arrayUnion, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Provided credentials
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-o86tXsN5LqZtLyeypJv11bJ6Kjeo72M",
+            authDomain: "snake-588e2.firebaseapp.com",
+            projectId: "snake-588e2",
+            storageBucket: "snake-588e2.firebasestorage.app",
+            messagingSenderId: "671632900690",
+            appId: "1:671632900690:web:ae7318742fa8d7d6c3558b",
+            measurementId: "G-73ZF1Z5VN2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Env metadata
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'snake-588e2-classroom';
+
+        // Core Game States
+        let currentUser = null;
+        let dbCollections = [];
+        let selectedCollectionId = null;
+        let activeRoomId = null;
+        let roomUnsubscribeListener = null;
+        let activeDeviceMode = 'local'; // 'local' or 'session'
+        let currentRole = 'player'; // 'player' or 'teacher-host'
+        let currentConnectedPlayerId = null;
+
+        const defaultMathCollection = {
+            id: 'default-math',
+            name: 'Default Math Flashcards',
+            questions: [
+                { question: "What is 7 x 8?", a: "54", b: "56", c: "64", d: "48", correct: "B" },
+                { question: "What is 120 / 10?", a: "10", b: "11", c: "12", d: "14", correct: "C" },
+                { question: "Simplify: 5 + (3 x 4)", a: "32", b: "17", c: "27", d: "20", correct: "B" },
+                { question: "Which is a prime number?", a: "9", b: "15", c: "17", d: "21", correct: "C" },
+                { question: "What is half of 74?", a: "37", b: "35", c: "38", d: "36", correct: "A" }
+            ]
+        };
+
         const ladders = { 4: 14, 9: 31, 20: 38, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91 };
         const snakes = { 17: 7, 54: 34, 62: 18, 64: 60, 87: 24, 93: 73, 95: 75, 99: 78 };
+        const playerColors = ["#e53935", "#1e88e5", "#2e7d32", "#fdd835", "#8e24aa", "#fb8c00"];
         
-        const playerColors = ["#e53935", "#1e88e5", "#43a047", "#fdd835", "#8e24aa", "#fb8c00"];
         let players = [];
         let currentPlayerIndex = 0;
         let gameActive = false;
+        let gameDeck = [];
 
-        // Initialize the board UI dynamically (Boustrophedon / Snake pattern grid)
-        function createBoard() {
+        // UI Alert replacement
+        window.showAlert = function(title, text, icon = "ℹ️") {
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-text').innerText = text;
+            document.getElementById('alert-icon').innerText = icon;
+            document.getElementById('custom-alert').classList.remove('hidden');
+        };
+
+        window.closeAlert = function() {
+            document.getElementById('custom-alert').classList.add('hidden');
+        };
+
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // --- CORE HELPER FUNCTIONS DECLARATIONS (Declared early to prevent ReferenceErrors) ---
+
+        window.createBoard = function() {
             const board = document.getElementById('board');
             board.innerHTML = '';
             
-            // Grid runs from 100 down to 1 row by row
             for (let row = 9; row >= 0; row--) {
                 let isRowEven = row % 2 === 0;
                 for (let col = 0; col < 10; col++) {
-                    let actualCol = isRowEven ? (9 - col) : col;
+                    let actualCol = isRowEven ? col : (9 - col);
                     let cellNumber = (row * 10) + actualCol + 1;
 
                     const cell = document.createElement('div');
                     cell.className = 'cell';
                     cell.id = `cell-${cellNumber}`;
-                    cell.innerHTML = `<span>${cellNumber}</span><div class="token-container" id="tokens-${cellNumber}"></div>`;
+                    cell.innerHTML = `<span>${cellNumber}</span>`;
                     board.appendChild(cell);
                 }
             }
-        }
+        };
 
-        // Setup dynamic inputs for player names
-        function generatePlayerInputs() {
+        window.generatePlayerInputs = function() {
             const count = document.getElementById('player-count').value;
             const container = document.getElementById('player-names-inputs');
             container.innerHTML = '';
             for(let i = 1; i <= count; i++) {
                 container.innerHTML += `
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="width:15px; height:15px; background:${playerColors[i-1]}; border-radius:50%;"></span>
-                        <input type="text" id="p-name-${i}" value="Student ${i}" style="width:80%;">
+                    <div class="flex items-center gap-2">
+                        <span class="w-4 h-4 rounded-full shadow border-2 border-white" style="background:${playerColors[i-1]}"></span>
+                        <input type="text" id="p-name-${i}" value="Student ${i}" class="w-full text-sm p-1.5 border rounded-md">
                     </div>
                 `;
             }
+        };
+
+        function updateCollectionsDropdown() {
+            const select = document.getElementById('game-collection-select');
+            select.innerHTML = `
+                <option value="classic">Classic (No Questions)</option>
+                <option value="default-math">Default Math Flashcards</option>
+            `;
+            dbCollections.forEach(col => {
+                select.innerHTML += `<option value="${col.id}">${col.name}</option>`;
+            });
         }
 
-        function startGame() {
-            const count = parseInt(document.getElementById('player-count').value);
-            players = [];
-            
-            for(let i = 1; i <= count; i++) {
-                let name = document.getElementById(`p-name-${i}`).value.trim();
-                if(!name) name = `Student ${i}`;
-                players.push({
-                    id: i,
-                    name: name,
-                    position: 0, // Starts off-board, 1st move lands on board
-                    color: playerColors[i-1]
-                });
+        function renderCollectionsSidebar() {
+            const container = document.getElementById('collections-list');
+            container.innerHTML = '';
+
+            if (dbCollections.length === 0) {
+                container.innerHTML = `<div class="text-sm text-slate-400 text-center py-4">No custom decks.</div>`;
+                return;
             }
 
-            document.getElementById('setup-area').style.display = 'none';
-            document.getElementById('game-area').style.display = 'flex';
-            gameActive = true;
-            currentPlayerIndex = 0;
-            
-            updateTurnUI();
-            updateTokens();
-            drawSnakesAndLadders();
+            dbCollections.forEach(col => {
+                const isSelected = col.id === selectedCollectionId;
+                const style = isSelected ? 'bg-purple-100 border-purple-950 text-purple-950' : 'bg-slate-50 border-slate-200 text-slate-700';
+                
+                container.innerHTML += `
+                    <div class="p-3 rounded-lg border flex justify-between items-center cursor-pointer ${style}" onclick="selectCollection('${col.id}')">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold truncate text-sm">${col.name}</h4>
+                            <p class="text-xs text-slate-500">${col.questions ? col.questions.length : 0} questions</p>
+                        </div>
+                        <button onclick="event.stopPropagation(); deleteCollection('${col.id}')" class="text-red-600 hover:text-red-800 p-1 text-xs">🗑️</button>
+                    </div>
+                `;
+            });
         }
 
-        // Get coordinates of the center of a cell for drawing canvas items
-        function getCellCenter(cellNum) {
-            if (cellNum < 1) cellNum = 1;
-            const row = Math.floor((cellNum - 1) / 10);
-            const col = (cellNum - 1) % 10;
+        function updateDashboardUI() {
+            const card = document.getElementById('teacher-auth-card');
+            const dash = document.getElementById('teacher-dashboard');
+            
+            if (currentUser && !currentUser.isAnonymous) {
+                card.classList.add('hidden');
+                dash.classList.remove('hidden');
+            } else {
+                card.classList.remove('hidden');
+                dash.classList.add('hidden');
+            }
+        }
+
+        function getCellCoords(cellNum) {
+            const isMobile = window.innerWidth < 640;
+            const cellSize = isMobile ? 32 : 60;
+            const halfCell = cellSize / 2;
+
+            if (cellNum < 1) return { x: -halfCell, y: cellSize * 10 - halfCell };
+            
+            const zeroBased = cellNum - 1;
+            const row = Math.floor(zeroBased / 10);
+            const col = zeroBased % 10;
             const actualCol = (row % 2 === 0) ? col : (9 - col);
             const actualRow = 9 - row;
 
             return {
-                x: actualCol * 60 + 30,
-                y: actualRow * 60 + 30
+                x: actualCol * cellSize + halfCell,
+                y: actualRow * cellSize + halfCell
             };
         }
 
-        // Draw Visual Snakes and Ladders on Canvas
+        function getPlayerCoords(cellNum, playerIndex) {
+            const base = getCellCoords(cellNum);
+            const isMobile = window.innerWidth < 640;
+            const separation = isMobile ? 8 : 15;
+
+            if (cellNum === 0) {
+                return { x: base.x, y: base.y - (playerIndex * separation) };
+            }
+
+            const offsets = isMobile ? [
+                {x: -6, y: -6}, {x: 6, y: -6},
+                {x: -6, y: 6},  {x: 6, y: 6},
+                {x: -9, y: 0},   {x: 9, y: 0}
+            ] : [
+                {x: -12, y: -12}, {x: 12, y: -12},
+                {x: -12, y: 12},  {x: 12, y: 12},
+                {x: -18, y: 0},   {x: 18, y: 0}
+            ];
+            
+            return {
+                x: base.x + offsets[playerIndex % offsets.length].x,
+                y: base.y + offsets[playerIndex % offsets.length].y
+            };
+        }
+
+        function updateTokenPosition(playerIndex) {
+            let player = players[playerIndex];
+            if (!player || !player.element) return;
+            let coords = getPlayerCoords(player.position, playerIndex);
+            player.element.style.left = `${coords.x}px`;
+            player.element.style.top = `${coords.y}px`;
+        }
+
+        function drawRealisticLadder(ctx, from, to) {
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            ctx.save();
+            ctx.translate(from.x, from.y);
+            ctx.rotate(angle);
+
+            const isMobile = window.innerWidth < 640;
+            const halfWidth = isMobile ? 7 : 14;
+
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+            ctx.shadowBlur = isMobile ? 2 : 5;
+            ctx.shadowOffsetX = isMobile ? 2 : 4;
+            ctx.shadowOffsetY = isMobile ? 2 : 4;
+
+            ctx.beginPath();
+            ctx.moveTo(0, -halfWidth);
+            ctx.lineTo(distance, -halfWidth);
+            ctx.moveTo(0, halfWidth);
+            ctx.lineTo(distance, halfWidth);
+            ctx.lineWidth = isMobile ? 3 : 6;
+            ctx.strokeStyle = '#5d4037';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.shadowColor = 'transparent';
+            ctx.beginPath();
+            ctx.moveTo(0, -halfWidth);
+            ctx.lineTo(distance, -halfWidth);
+            ctx.moveTo(0, halfWidth);
+            ctx.lineTo(distance, halfWidth);
+            ctx.lineWidth = isMobile ? 1.5 : 3;
+            ctx.strokeStyle = '#8d6e63';
+            ctx.stroke();
+
+            const spacing = isMobile ? 14 : 28;
+            const numRungs = Math.floor(distance / spacing);
+            for (let i = 1; i < numRungs; i++) {
+                const x = (i / numRungs) * distance;
+
+                ctx.beginPath();
+                ctx.moveTo(x, -halfWidth + (isMobile ? 1 : 2));
+                ctx.lineTo(x, halfWidth - (isMobile ? 1 : 2));
+                ctx.lineWidth = isMobile ? 2 : 4;
+                ctx.strokeStyle = '#4e342e';
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(x, -halfWidth + (isMobile ? 1.5 : 3));
+                ctx.lineTo(x, halfWidth - (isMobile ? 1.5 : 3));
+                ctx.lineWidth = isMobile ? 1 : 2;
+                ctx.strokeStyle = '#b0bec5';
+                ctx.stroke();
+
+                ctx.fillStyle = '#cfd8dc';
+                ctx.fillRect(x - (isMobile ? 1 : 2), -halfWidth - (isMobile ? 1.5 : 3), isMobile ? 2 : 4, isMobile ? 1.5 : 3);
+                ctx.fillRect(x - (isMobile ? 1 : 2), halfWidth, isMobile ? 2 : 4, isMobile ? 1.5 : 3);
+            }
+
+            ctx.restore();
+        }
+
+        function drawRealisticSnake(ctx, from, to, variantColor1, variantColor2) {
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            ctx.save();
+            ctx.translate(from.x, from.y);
+            ctx.rotate(angle);
+
+            const isMobile = window.innerWidth < 640;
+            const segments = 40;
+            const slitherFreq = 2.5;
+            const maxAmplitude = isMobile ? 9 : 18;
+            const points = [];
+
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const x = t * distance;
+                const waveAmp = Math.sin(t * Math.PI) * maxAmplitude; 
+                const y = Math.sin(t * Math.PI * slitherFreq) * waveAmp;
+                const thickness = Math.max(isMobile ? 1 : 2, (isMobile ? 5.5 : 11) * (1 - t * 0.85)); 
+                points.push({ x, y, r: thickness });
+            }
+
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = isMobile ? 3 : 6;
+            ctx.shadowOffsetX = isMobile ? 1.5 : 3;
+            ctx.shadowOffsetY = isMobile ? 2.5 : 5;
+
+            ctx.beginPath();
+            for (let i = 0; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.strokeStyle = 'rgba(10, 10, 10, 0.6)';
+            ctx.lineWidth = isMobile ? 7 : 14;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+            ctx.shadowColor = 'transparent';
+
+            for (let i = points.length - 1; i >= 0; i--) {
+                const p = points[i];
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
+                
+                if (i % 3 === 0) {
+                    ctx.fillStyle = variantColor1;
+                } else if (i % 3 === 1) {
+                    ctx.fillStyle = variantColor2;
+                } else {
+                    ctx.fillStyle = '#212121';
+                }
+                ctx.fill();
+            }
+
+            ctx.beginPath();
+            ctx.ellipse(0, 0, isMobile ? 7 : 14, isMobile ? 5 : 10, 0, 0, 2 * Math.PI);
+            ctx.fillStyle = variantColor1;
+            ctx.fill();
+            ctx.lineWidth = isMobile ? 0.75 : 1.5;
+            ctx.strokeStyle = '#111';
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffeb3b';
+            ctx.beginPath();
+            ctx.arc(isMobile ? -1 : -2, isMobile ? -2 : -4, isMobile ? 1.5 : 3, 0, 2 * Math.PI);
+            ctx.arc(isMobile ? -1 : -2, isMobile ? 2 : 4, isMobile ? 1.5 : 3, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.fillRect(isMobile ? -1.5 : -3, isMobile ? -3 : -6, isMobile ? 0.75 : 1.5, isMobile ? 2 : 4);
+            ctx.fillRect(isMobile ? -1.5 : -3, isMobile ? 1 : 2, isMobile ? 0.75 : 1.5, isMobile ? 2 : 4);
+
+            ctx.beginPath();
+            ctx.moveTo(isMobile ? -6 : -12, 0);
+            ctx.lineTo(isMobile ? -12 : -24, 0);
+            ctx.lineTo(isMobile ? -14 : -28, isMobile ? -2 : -4);
+            ctx.moveTo(isMobile ? -12 : -24, 0);
+            ctx.lineTo(isMobile ? -14 : -28, isMobile ? 2 : 4);
+            ctx.strokeStyle = '#e53935';
+            ctx.lineWidth = isMobile ? 1 : 2;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
         function drawSnakesAndLadders() {
             const canvas = document.getElementById('board-canvas');
+            const isMobile = window.innerWidth < 640;
+            canvas.width = isMobile ? 320 : 600;
+            canvas.height = isMobile ? 320 : 600;
+
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Ladders (Green lines)
             for (let start in ladders) {
-                let from = getCellCenter(parseInt(start));
-                let to = getCellCenter(ladders[start]);
-                
-                ctx.beginPath();
-                ctx.moveTo(from.x, from.y);
-                ctx.lineTo(to.x, to.y);
-                ctx.lineWidth = 6;
-                ctx.strokeStyle = '#2e7d32'; // Forest green
-                ctx.stroke();
-
-                // Simple Ladder Rungs
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#a5d6a7';
-                let steps = 5;
-                for(let j=1; j<steps; j++) {
-                    let rX = from.x + (to.x - from.x) * (j/steps);
-                    let rY = from.y + (to.y - from.y) * (j/steps);
-                    ctx.fillStyle = '#2e7d32';
-                    ctx.fillRect(rX - 4, rY - 4, 8, 8);
-                }
+                let from = getCellCoords(parseInt(start));
+                let to = getCellCoords(ladders[start]);
+                drawRealisticLadder(ctx, from, to);
             }
 
-            // Draw Snakes (Red curves)
+            const snakeSkins = [
+                { c1: '#d84315', c2: '#ffb300' },
+                { c1: '#2e7d32', c2: '#a5d6a7' },
+                { c1: '#1565c0', c2: '#80deea' }
+            ];
+
+            let skinIndex = 0;
             for (let start in snakes) {
-                let from = getCellCenter(parseInt(start));
-                let to = getCellCenter(snakes[start]);
-
-                ctx.beginPath();
-                ctx.moveTo(from.x, from.y);
-                // Control point for a slight curve
-                let cpX = (from.x + to.x) / 2 + 30;
-                let cpY = (from.y + to.y) / 2 - 30;
-                ctx.quadraticCurveTo(cpX, cpY, to.x, to.y);
-                ctx.lineWidth = 5;
-                ctx.strokeStyle = '#d32f2f'; // Crimson red
-                ctx.stroke();
-
-                // Snake head indicator
-                ctx.fillStyle = '#d32f2f';
-                ctx.beginPath();
-                ctx.arc(from.x, from.y, 7, 0, 2 * Math.PI);
-                ctx.fill();
+                let from = getCellCoords(parseInt(start));
+                let to = getCellCoords(snakes[start]);
+                const skin = snakeSkins[skinIndex % snakeSkins.length];
+                drawRealisticSnake(ctx, from, to, skin.c1, skin.c2);
+                skinIndex++;
             }
-        }
-
-        function updateTokens() {
-            // Clear all previous containers
-            for(let i = 1; i <= 100; i++) {
-                document.getElementById(`tokens-${i}`).innerHTML = '';
-            }
-            // Place players
-            players.forEach(p => {
-                if(p.position > 0 && p.position <= 100) {
-                    const container = document.getElementById(`tokens-${p.position}`);
-                    if(container) {
-                        container.innerHTML += `<span class="token" style="background-color: ${p.color};" title="${p.name}"></span>`;
-                    }
-                }
-            });
         }
 
         function updateTurnUI() {
             const current = players[currentPlayerIndex];
+            if (!current) return;
             const turnBox = document.getElementById('current-turn');
             turnBox.innerText = `Turn: ${current.name}`;
-            turnBox.style.borderLeft = `8px solid ${current.color}`;
+            turnBox.style.borderLeftColor = current.color;
         }
 
         function logMessage(msg) {
             const log = document.getElementById('game-log');
-            log.innerHTML = `<div>${msg}</div>` + log.innerHTML;
+            const entry = document.createElement('div');
+            entry.innerHTML = msg;
+            log.prepend(entry);
         }
 
-        function rollDice() {
-            if(!gameActive) return;
+        // --- CLOUD FIREBASE ACCESS METHODS ---
+        async function fetchCollections() {
+            if (!currentUser) return;
+            try {
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections');
+                const snap = await getDocs(colRef);
+                dbCollections = [];
+                snap.forEach(d => {
+                    dbCollections.push({ id: d.id, ...d.data() });
+                });
+                updateCollectionsDropdown();
+                renderCollectionsSidebar();
+            } catch (err) {
+                console.error("Error loading library collections:", err);
+            }
+        }
 
-            const diceBtn = document.getElementById('dice-btn');
-            diceBtn.disabled = true; // prevent double clicks
+        // --- AUTHENTICATION FLOW SETUP ---
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    try {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } catch (tokenError) {
+                        console.warn("Custom token sign-in failed, falling back to anonymous authentication:", tokenError);
+                        await signInAnonymously(auth);
+                    }
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth init exception:", error);
+            }
+        };
 
-            const roll = Math.floor(Math.random() * 6) + 1;
-            document.getElementById('dice-result').innerText = `🎲 ${roll}`;
-            
-            let player = players[currentPlayerIndex];
-            let oldPos = player.position;
-            let newPos = oldPos + roll;
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user) {
+                const badge = document.getElementById('teacher-status-badge');
+                if (user.isAnonymous) {
+                    badge.classList.add('hidden');
+                } else {
+                    badge.classList.remove('hidden');
+                    badge.innerText = `Teacher: ${user.email.split('@')[0]}`;
+                }
+                updateDashboardUI();
+                fetchCollections();
+            } else {
+                document.getElementById('teacher-status-badge').classList.add('hidden');
+            }
+        });
 
-            logMessage(`${player.name} rolled a ${roll}.`);
+        // Initialize Authentication immediately
+        initAuth();
 
-            if (newPos > 100) {
-                logMessage(`${player.name} needs exact roll to reach 100.`);
-                nextTurn();
+        // --- AUTHENTICATION ACTIONS ---
+        window.handleTeacherLogin = async function() {
+            const email = document.getElementById('teacher-email').value.trim();
+            const password = document.getElementById('teacher-password').value;
+            if (!email || !password) return;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                showAlert("Welcome", "Logged in successfully!", "🔐");
+            } catch (err) {
+                showAlert("Login Failed", err.message, "❌");
+            }
+        };
+
+        window.handleTeacherRegister = async function() {
+            const email = document.getElementById('teacher-email').value.trim();
+            const password = document.getElementById('teacher-password').value;
+            if (!email || !password) return;
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                showAlert("Registration Complete", "New account created & logged in!", "📝");
+            } catch (err) {
+                showAlert("Registration Failed", err.message, "❌");
+            }
+        };
+
+        window.handleAnonymousLogin = async function() {
+            try {
+                await signInAnonymously(auth);
+                showAlert("Guest Portal", "Signed in as Guest.");
+            } catch (err) {
+                showAlert("Error", err.message);
+            }
+        };
+
+        window.handleSignOut = async function() {
+            try {
+                await signOut(auth);
+                await signInAnonymously(auth);
+                selectedCollectionId = null;
+                document.getElementById('collection-detail').classList.add('hidden');
+                document.getElementById('no-collection-selected').classList.remove('hidden');
+                showAlert("Signed Out", "Returned to Guest Portal mode.");
+            } catch (err) {
+                console.error(err);
+            }
+        };
+
+        // --- DUAL MODE CONFIGS ---
+        window.setGameMode = function(mode) {
+            activeDeviceMode = mode;
+            const btnLocal = document.getElementById('btn-local-mode');
+            const btnSession = document.getElementById('btn-session-mode');
+            const panelLocal = document.getElementById('panel-setup-local');
+            const panelSession = document.getElementById('panel-setup-session');
+
+            if (mode === 'local') {
+                btnLocal.className = "p-3 rounded-lg border-2 border-purple-950 bg-purple-50 text-purple-950 font-bold text-sm transition";
+                btnSession.className = "p-3 rounded-lg border-2 border-slate-200 hover:border-purple-300 text-slate-600 font-bold text-sm transition";
+                panelLocal.classList.remove('hidden');
+                panelSession.classList.add('hidden');
+            } else {
+                btnSession.className = "p-3 rounded-lg border-2 border-purple-950 bg-purple-50 text-purple-950 font-bold text-sm transition";
+                btnLocal.className = "p-3 rounded-lg border-2 border-slate-200 hover:border-purple-300 text-slate-600 font-bold text-sm transition";
+                panelLocal.classList.add('hidden');
+                panelSession.classList.remove('hidden');
+            }
+        };
+
+        // --- MULTIPLAYER ROOM ENGINE ---
+        function generateRoomCode() {
+            const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; 
+            let code = '';
+            for (let i = 0; i < 4; i++) {
+                code += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return code;
+        }
+
+        window.hostLiveSession = async function() {
+            if (!currentUser || currentUser.isAnonymous) {
+                showAlert("Authentication Required", "Please log in with email and password to host multiplayer matches.", "🔒");
                 return;
             }
 
-            player.position = newPos;
+            const colObj = dbCollections.find(c => c.id === selectedCollectionId);
+            if (!colObj) return;
 
-            // Check for Snakes or Ladders
-            setTimeout(() => {
-                if (ladders[player.position]) {
-                    logMessage(`🚀 Awesome! ${player.name} climbed a ladder from ${player.position} to ${ladders[player.position]}!`);
-                    player.position = ladders[player.position];
-                } else if (snakes[player.position]) {
-                    logMessage(`🐍 Oh no! ${player.name} bit by a snake from ${player.position} down to ${snakes[player.position]}!`);
-                    player.position = snakes[player.position];
+            const roomCode = generateRoomCode();
+            try {
+                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', roomCode);
+                
+                await setDoc(roomDocRef, {
+                    sessionId: roomCode,
+                    teacherId: currentUser.uid,
+                    deckName: colObj.name,
+                    questions: colObj.questions || [],
+                    status: 'waiting', 
+                    players: [],
+                    currentPlayerIndex: 0,
+                    diceResult: '-',
+                    logEvents: [],
+                    timestamp: Date.now()
+                });
+
+                switchTab('game');
+                setGameMode('session');
+                
+                document.getElementById('game-selection-panel').classList.add('hidden');
+                document.getElementById('session-lobby-panel').classList.remove('hidden');
+                document.getElementById('lobby-code-badge').innerText = roomCode;
+
+                currentRole = 'teacher-host';
+                activeRoomId = roomCode;
+                
+                const lobby = document.getElementById('session-lobby-panel');
+                const startBtnExists = document.getElementById('btn-lobby-host-start');
+                if (!startBtnExists) {
+                    lobby.innerHTML += `
+                        <button id="btn-lobby-host-start" onclick="hostStartRoom()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg mt-4 shadow-md transition">
+                            🚀 Start Match
+                        </button>
+                    `;
                 }
 
-                updateTokens();
+                listenToRoomState(roomCode);
+            } catch (err) {
+                showAlert("Error", "Could not spin up live session: " + err.message);
+            }
+        };
 
-                // Check Win Condition
-                if (player.position === 100) {
-                    alert(`🎉🎉🎉 ${player.name} WINS THE GAME! 🎉🎉🎉`);
-                    logMessage(`🏆 ${player.name} won the game!`);
-                    gameActive = false;
+        window.joinLiveSession = async function() {
+            const codeInput = document.getElementById('join-session-code').value.trim().toUpperCase();
+            const playerName = document.getElementById('join-player-name').value.trim();
+
+            if (!codeInput || !playerName) {
+                showAlert("Missing Inputs", "Please input both the session code and your name to join.");
+                return;
+            }
+
+            try {
+                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', codeInput);
+                const roomSnap = await getDoc(roomDocRef);
+
+                if (!roomSnap.exists()) {
+                    showAlert("Invalid Code", "No active session matching that room code was found.", "❓");
                     return;
                 }
 
-                nextTurn();
-            }, 600);
+                const roomData = roomSnap.data();
+                if (roomData.status !== 'waiting') {
+                    showAlert("Cannot Join", "This match has already started or finished.", "🚫");
+                    return;
+                }
+
+                const deviceUserId = currentUser ? currentUser.uid : crypto.randomUUID();
+                currentConnectedPlayerId = deviceUserId;
+
+                const joinedPlayerObj = {
+                    uid: deviceUserId,
+                    name: playerName,
+                    position: 0,
+                    color: playerColors[roomData.players.length % playerColors.length]
+                };
+
+                const updatedPlayers = [...roomData.players, joinedPlayerObj];
+                await updateDoc(roomDocRef, {
+                    players: updatedPlayers
+                });
+
+                document.getElementById('game-selection-panel').classList.add('hidden');
+                document.getElementById('session-lobby-panel').classList.remove('hidden');
+                document.getElementById('lobby-code-badge').innerText = codeInput;
+
+                const startBtn = document.getElementById('btn-lobby-host-start');
+                if (startBtn) startBtn.remove();
+
+                currentRole = 'player';
+                activeRoomId = codeInput;
+
+                listenToRoomState(codeInput);
+            } catch (err) {
+                showAlert("Failed to Join", err.message);
+            }
+        };
+
+        window.hostStartRoom = async function() {
+            if (!activeRoomId) return;
+            const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
+            const snap = await getDoc(roomDocRef);
+            
+            if (snap.exists()) {
+                const rData = snap.data();
+                if (rData.players.length < 2) {
+                    showAlert("Waiting", "Please wait for at least 2 students to connect their devices first.", "⌛");
+                    return;
+                }
+                
+                await updateDoc(roomDocRef, {
+                    status: 'playing',
+                    currentPlayerIndex: 0,
+                    logEvents: ['⚔️ Multiplayer session started! Answer quiz prompts to move!']
+                });
+            }
+        };
+
+        function listenToRoomState(roomCode) {
+            if (roomUnsubscribeListener) roomUnsubscribeListener();
+
+            const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', roomCode);
+            roomUnsubscribeListener = onSnapshot(roomDocRef, (snap) => {
+                if (!snap.exists()) {
+                    quitActiveMatch();
+                    showAlert("Room Ended", "The host has closed or ended this game session.");
+                    return;
+                }
+
+                const data = snap.data();
+                
+                if (data.status === 'waiting') {
+                    const playersList = document.getElementById('lobby-players-list');
+                    playersList.innerHTML = '';
+                    data.players.forEach(p => {
+                        playersList.innerHTML += `
+                            <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
+                                <span class="font-bold flex items-center gap-2">
+                                    <span class="w-3.5 h-3.5 rounded-full" style="background:${p.color}"></span>
+                                    ${p.name}
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-mono">Connected</span>
+                            </div>
+                        `;
+                    });
+                } 
+                else if (data.status === 'playing' || data.status === 'complete') {
+                    document.getElementById('session-lobby-panel').classList.add('hidden');
+                    document.getElementById('game-active-panel').classList.remove('hidden');
+
+                    const idIndicator = document.getElementById('session-id-indicator');
+                    idIndicator.innerText = `SESSION: ${data.sessionId}`;
+                    idIndicator.classList.remove('hidden');
+
+                    gameDeck = data.questions || [];
+                    syncPlayerBoardChips(data);
+                }
+            }, (err) => {
+                console.error("Session Real-time Stream broken:", err);
+            });
+        }
+
+        async function syncPlayerBoardChips(data) {
+            const winningPlayer = data.players.find(p => p.position === 100);
+            const board = document.getElementById('board');
+            let isBoardBuilt = board.querySelector('.token');
+            
+            if (!isBoardBuilt || players.length !== data.players.length) {
+                document.querySelectorAll('.token').forEach(t => t.remove());
+                players = [];
+                data.players.forEach((p, idx) => {
+                    let tokenEl = document.createElement('div');
+                    tokenEl.className = 'token';
+                    tokenEl.style.backgroundColor = p.color;
+                    board.appendChild(tokenEl);
+
+                    players.push({
+                        ...p,
+                        element: tokenEl
+                    });
+                });
+            }
+
+            data.players.forEach((dbP, idx) => {
+                players[idx].position = dbP.position;
+                updateTokenPosition(idx);
+            });
+
+            currentPlayerIndex = data.currentPlayerIndex;
+            updateTurnUI();
+
+            const logEl = document.getElementById('game-log');
+            logEl.innerHTML = '';
+            if (data.logEvents) {
+                data.logEvents.forEach(evt => {
+                    const entry = document.createElement('div');
+                    entry.innerHTML = evt;
+                    logEl.appendChild(entry);
+                });
+            }
+
+            document.getElementById('dice-result').innerText = data.diceResult || '-';
+
+            const currentRollPlayer = data.players[data.currentPlayerIndex];
+            const diceBtn = document.getElementById('dice-btn');
+
+            if (data.status === 'complete') {
+                diceBtn.disabled = true;
+                diceBtn.innerText = `🏆 ${winningPlayer ? winningPlayer.name : 'Someone'} Won!`;
+                diceBtn.className = "w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
+            } else {
+                if (currentRollPlayer.uid === currentConnectedPlayerId || currentRole === 'teacher-host') {
+                    diceBtn.disabled = false;
+                    diceBtn.innerText = "🎲 YOUR TURN: ROLL!";
+                    diceBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
+                } else {
+                    diceBtn.disabled = true;
+                    diceBtn.innerText = `⌛ Waiting for ${currentRollPlayer.name}`;
+                    diceBtn.className = "w-full bg-amber-200 text-amber-700 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
+                }
+            }
+
+            // Always update control buttons to adapt in real-time
+            renderControlButtons();
+        }
+
+        // --- COLLECTION SELECTION ENGINE ---
+        window.selectCollection = function(colId) {
+            selectedCollectionId = colId;
+            renderCollectionsSidebar();
+
+            const colObj = dbCollections.find(c => c.id === colId);
+            if (!colObj) return;
+
+            document.getElementById('no-collection-selected').classList.add('hidden');
+            const view = document.getElementById('collection-detail');
+            view.classList.remove('hidden');
+
+            document.getElementById('current-col-title').innerText = colObj.name;
+            renderQuestionsGrid(colObj);
+        };
+
+        // --- DASHBOARD WRITES (Rule 1) ---
+        window.openCreateCollectionModal = () => document.getElementById('create-collection-modal').classList.remove('hidden');
+        window.closeCreateCollectionModal = () => document.getElementById('create-collection-modal').classList.add('hidden');
+
+        window.submitNewCollection = async function() {
+            const name = document.getElementById('new-collection-name').value.trim();
+            if (!name) return;
+
+            try {
+                const docRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'questionCollections'));
+                await setDoc(docRef, {
+                    name: name,
+                    teacherId: currentUser.uid,
+                    questions: []
+                });
+
+                document.getElementById('new-collection-name').value = '';
+                closeCreateCollectionModal();
+                await fetchCollections();
+                selectCollection(docRef.id);
+                showAlert("Success", `Deck "${name}" added.`, "✅");
+            } catch (err) {
+                showAlert("Error", err.message);
+            }
+        };
+
+        window.deleteCollection = async function(colId) {
+            if (!confirm("Delete this deck permanently?")) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', colId));
+                selectedCollectionId = null;
+                document.getElementById('collection-detail').classList.add('hidden');
+                document.getElementById('no-collection-selected').classList.remove('hidden');
+                await fetchCollections();
+            } catch (err) {
+                showAlert("Error", err.message);
+            }
+        };
+
+        window.openManualQuestionModal = () => document.getElementById('manual-question-modal').classList.remove('hidden');
+        window.closeManualQuestionModal = () => document.getElementById('manual-question-modal').classList.add('hidden');
+
+        window.submitManualQuestion = async function() {
+            const question = document.getElementById('manual-prompt').value.trim();
+            const a = document.getElementById('manual-a').value.trim();
+            const b = document.getElementById('manual-b').value.trim();
+            const c = document.getElementById('manual-c').value.trim();
+            const d = document.getElementById('manual-d').value.trim();
+            const correct = document.getElementById('manual-correct').value;
+
+            if (!question || !a || !b || !c || !d) return;
+
+            const newCard = { question, a, b, c, d, correct };
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+                await updateDoc(docRef, { questions: arrayUnion(newCard) });
+
+                document.getElementById('manual-prompt').value = '';
+                document.getElementById('manual-a').value = '';
+                document.getElementById('manual-b').value = '';
+                document.getElementById('manual-c').value = '';
+                document.getElementById('manual-d').value = '';
+
+                closeManualQuestionModal();
+                await fetchCollections();
+                selectCollection(selectedCollectionId);
+            } catch (err) {
+                showAlert("Error", err.message);
+            }
+        };
+
+        window.deleteQuestion = async function(idx) {
+            const colObj = dbCollections.find(c => c.id === selectedCollectionId);
+            if (!colObj) return;
+
+            const list = [...colObj.questions];
+            list.splice(idx, 1);
+
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+                await updateDoc(docRef, { questions: list });
+                await fetchCollections();
+                selectCollection(selectedCollectionId);
+            } catch (err) {
+                showAlert("Error", err.message);
+            }
+        };
+
+        window.openCsvModal = () => document.getElementById('csv-import-modal').classList.remove('hidden');
+        window.closeCsvModal = () => document.getElementById('csv-import-modal').classList.add('hidden');
+
+        window.handleCsvUpload = function() {
+            const fileInput = document.getElementById('csv-file-input');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const rows = e.target.result.split('\n');
+                const parsed = [];
+
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i].trim();
+                    if (!row) continue;
+
+                    const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    if (cols.length < 6) continue;
+
+                    const clean = (s) => s.replace(/^"|"$/g, '').trim();
+                    parsed.push({
+                        question: clean(cols[0]),
+                        a: clean(cols[1]),
+                        b: clean(cols[2]),
+                        c: clean(cols[3]),
+                        d: clean(cols[4]),
+                        correct: clean(cols[5]).toUpperCase()
+                    });
+                }
+
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'questionCollections', selectedCollectionId);
+                    await updateDoc(docRef, { questions: arrayUnion(...parsed) });
+                    fileInput.value = '';
+                    closeCsvModal();
+                    await fetchCollections();
+                    selectCollection(selectedCollectionId);
+                } catch (err) {
+                    showAlert("Import Error", err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        // --- SESSION CONTROL BUTTON BUILDER ---
+        function renderControlButtons() {
+            const container = document.getElementById('dynamic-action-controls');
+            if (!container) return;
+
+            if (!activeRoomId) {
+                // Local Mode Controls
+                container.innerHTML = `
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="resetLocalGame()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-lg transition text-sm flex items-center justify-center gap-1 shadow">
+                            🔄 Reset Game
+                        </button>
+                        <button onclick="quitActiveMatch()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg transition text-sm flex items-center justify-center gap-1 shadow">
+                            🚪 Quit Match
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Session Mode Controls
+                if (currentRole === 'teacher-host') {
+                    container.innerHTML = `
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="resetSessionGame()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition text-sm flex items-center justify-center gap-1 shadow">
+                                🔄 Reset Room
+                            </button>
+                            <button onclick="endSessionGame()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg transition text-sm flex items-center justify-center gap-1 shadow">
+                                🛑 End Game
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <button onclick="quitActiveMatch()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition flex items-center justify-center gap-1 shadow">
+                            🚪 Leave Room
+                        </button>
+                    `;
+                }
+            }
+        }
+
+        // --- LOCAL RESET & SESSION TERMINATION HANDLERS ---
+        window.resetLocalGame = function() {
+            if (!confirm("Are you sure you want to reset the game? All players will return to start.")) return;
+            players.forEach((p, idx) => {
+                p.position = 0;
+                updateTokenPosition(idx);
+            });
+            currentPlayerIndex = 0;
+            gameActive = true;
+            document.getElementById('dice-result').innerText = '-';
+            document.getElementById('game-log').innerHTML = '';
+            document.getElementById('dice-btn').disabled = false;
+            updateTurnUI();
+            logMessage("🔄 Game reset! All players are back at the start.");
+        };
+
+        window.resetSessionGame = async function() {
+            if (!activeRoomId) return;
+            if (!confirm("Are you sure you want to reset the live session? All players will return to start.")) return;
+            try {
+                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
+                const snap = await getDoc(roomDocRef);
+                if (snap.exists()) {
+                    const rData = snap.data();
+                    const resetPlayers = rData.players.map(p => ({
+                        ...p,
+                        position: 0
+                    }));
+                    await updateDoc(roomDocRef, {
+                        players: resetPlayers,
+                        currentPlayerIndex: 0,
+                        diceResult: '-',
+                        status: 'playing', 
+                        logEvents: ['🔄 Host reset the session! All players are back at start.']
+                    });
+                }
+            } catch (err) {
+                showAlert("Error", "Could not reset session: " + err.message);
+            }
+        };
+
+        window.endSessionGame = async function() {
+            if (!activeRoomId) return;
+            if (!confirm("Are you sure you want to end this game permanently? This will delete the session on all devices.")) return;
+            try {
+                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
+                await deleteDoc(roomDocRef);
+                quitActiveMatch();
+                showAlert("Session Deleted", "The live room session was terminated.");
+            } catch (err) {
+                showAlert("Error", "Could not delete session: " + err.message);
+            }
+        };
+
+        // --- GAMEPLAY TRIGGERS & ACTIONS ---
+        window.startLocalGame = function() {
+            const activeColSelected = document.getElementById('game-collection-select').value;
+            
+            if (activeColSelected === 'classic') {
+                gameDeck = [];
+            } else if (activeColSelected === 'default-math') {
+                gameDeck = [...defaultMathCollection.questions];
+            } else {
+                const cloudCol = dbCollections.find(c => c.id === activeColSelected);
+                gameDeck = cloudCol && cloudCol.questions ? [...cloudCol.questions] : [];
+            }
+
+            const count = parseInt(document.getElementById('player-count').value);
+            players = [];
+            document.querySelectorAll('.token').forEach(t => t.remove());
+
+            const board = document.getElementById('board');
+            for(let i = 1; i <= count; i++) {
+                let name = document.getElementById(`p-name-${i}`).value.trim();
+                if(!name) name = `Student ${i}`;
+                
+                let tokenEl = document.createElement('div');
+                tokenEl.className = 'token';
+                tokenEl.style.backgroundColor = playerColors[i-1];
+                board.appendChild(tokenEl);
+
+                players.push({
+                    uid: `local-${i}`,
+                    name: name,
+                    position: 0,
+                    color: playerColors[i-1],
+                    element: tokenEl
+                });
+            }
+
+            document.getElementById('game-selection-panel').classList.add('hidden');
+            document.getElementById('game-active-panel').classList.remove('hidden');
+            document.getElementById('game-log').innerHTML = '';
+            
+            gameActive = true;
+            currentPlayerIndex = 0;
+            currentRole = 'teacher-host'; 
+            activeRoomId = null; 
+
+            updateTurnUI();
+            drawSnakesAndLadders();
+            players.forEach((p, index) => updateTokenPosition(index));
+            logMessage(`🖥️ Classic Local Device Game Initialized.`);
+            
+            // Build Controls
+            renderControlButtons();
+        };
+
+        // --- CORE DICE ROLL ACTIONS & TRANSITIONS ---
+        window.rollDice = async function() {
+            if (activeRoomId) {
+                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
+                const snap = await getDoc(roomDocRef);
+                if (!snap.exists()) return;
+                const rData = snap.data();
+
+                let diceRollAnim = 1;
+                const rollBtn = document.getElementById('dice-btn');
+                rollBtn.disabled = true;
+
+                for(let i=0; i<4; i++) {
+                    diceRollAnim = Math.floor(Math.random() * 6) + 1;
+                    document.getElementById('dice-result').innerText = `🎲 ${diceRollAnim}`;
+                    await sleep(100);
+                }
+
+                const roll = Math.floor(Math.random() * 6) + 1;
+                
+                let activePlayer = rData.players[rData.currentPlayerIndex];
+                let oldPos = activePlayer.position;
+                let newPos = oldPos + roll;
+
+                let updatedPlayersArray = [...rData.players];
+                let logs = [...rData.logEvents];
+
+                logs.unshift(`🎲 <b>${activePlayer.name}</b> rolled a ${roll}.`);
+
+                if (newPos > 100) {
+                    logs.unshift(`🛑 <b>${activePlayer.name}</b> needs an exact roll to hit tile 100.`);
+                    const nextIdx = (rData.currentPlayerIndex + 1) % rData.players.length;
+                    
+                    await updateDoc(roomDocRef, {
+                        diceResult: `🎲 ${roll}`,
+                        currentPlayerIndex: nextIdx,
+                        logEvents: logs
+                    });
+                    return;
+                }
+
+                activePlayer.position = newPos;
+                updatedPlayersArray[rData.currentPlayerIndex] = activePlayer;
+
+                await updateDoc(roomDocRef, {
+                    diceResult: `🎲 ${roll}`,
+                    players: updatedPlayersArray,
+                    logEvents: logs
+                });
+
+                await sleep(300);
+                await verifySnakeLadderCloud(rData.currentPlayerIndex, updatedPlayersArray, logs);
+
+            } else {
+                if (!gameActive) return;
+                const diceBtn = document.getElementById('dice-btn');
+                diceBtn.disabled = true; 
+
+                for(let i=0; i<5; i++) {
+                    document.getElementById('dice-result').innerText = `🎲 ${Math.floor(Math.random() * 6) + 1}`;
+                    await sleep(100);
+                }
+
+                const roll = Math.floor(Math.random() * 6) + 1;
+                document.getElementById('dice-result').innerText = `🎲 ${roll}`;
+                
+                let player = players[currentPlayerIndex];
+                
+                if (player.position + roll > 100) {
+                    logMessage(`🛑 <b>${player.name}</b> rolled a ${roll} but needs an exact roll to hit 100!`);
+                    await sleep(1500);
+                    nextTurn();
+                    return;
+                }
+
+                logMessage(`▶️ <b>${player.name}</b> rolled a ${roll}.`);
+                
+                for (let step = 0; step < roll; step++) {
+                    player.position += 1;
+                    updateTokenPosition(currentPlayerIndex);
+                    await sleep(300);
+                }
+
+                await sleep(200); 
+                await checkSnakeLadderLocal(currentPlayerIndex);
+            }
+        };
+
+        // --- REAL-TIME TRIVIA DECISION MODALS ---
+        async function triggerTriviaChallenge(player, isLadder) {
+            return new Promise((resolve) => {
+                if (gameDeck.length === 0) {
+                    resolve(true); 
+                    return;
+                }
+
+                const randQ = gameDeck[Math.floor(Math.random() * gameDeck.length)];
+                const modal = document.getElementById('trivia-modal');
+                const badge = document.getElementById('trivia-type-badge');
+                
+                if (isLadder) {
+                    badge.innerText = "🚀 LADDER CHALLENGE!";
+                    badge.className = "bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full text-sm";
+                } else {
+                    badge.innerText = "🐍 SNAKE DEFENSE CHANCE!";
+                    badge.className = "bg-red-100 text-red-800 font-bold px-3 py-1 rounded-full text-sm";
+                }
+
+                document.getElementById('trivia-player-name').innerText = `${player.name}'s Challenge`;
+                document.getElementById('trivia-question-text').innerText = randQ.question;
+
+                const container = document.getElementById('trivia-options-container');
+                container.innerHTML = '';
+
+                const map = { 'A': randQ.a, 'B': randQ.b, 'C': randQ.c, 'D': randQ.d };
+                let answered = false;
+                let timeLeft = 15;
+                document.getElementById('timer-sec').innerText = timeLeft;
+
+                const timerInterval = setInterval(() => {
+                    timeLeft--;
+                    document.getElementById('timer-sec').innerText = timeLeft;
+                    if (timeLeft <= 0) {
+                        finish(null);
+                    }
+                }, 1000);
+
+                const finish = (key) => {
+                    if (answered) return;
+                    answered = true;
+                    clearInterval(timerInterval);
+                    modal.classList.add('hidden');
+                    resolve(key === randQ.correct);
+                };
+
+                for (let k in map) {
+                    const btn = document.createElement('button');
+                    btn.className = "p-4 bg-slate-100 hover:bg-purple-950 hover:text-white rounded-xl border text-left font-semibold transition active:scale-95 text-sm";
+                    btn.innerHTML = `<b>${k}:</b> ${map[k]}`;
+                    btn.onclick = () => finish(k);
+                    container.appendChild(btn);
+                }
+
+                modal.classList.remove('hidden');
+            });
+        }
+
+        async function verifySnakeLadderCloud(index, playersArray, logs) {
+            const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
+            let player = playersArray[index];
+
+            if (ladders[player.position]) {
+                const target = ladders[player.position];
+                logs.unshift(`🧠 quiz! <b>${player.name}</b> lands on a ladder. Answer correctly to climb!`);
+                await updateDoc(roomDocRef, { logEvents: logs });
+
+                const passed = await triggerTriviaChallenge(player, true);
+                if (passed) {
+                    logs.unshift(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
+                    player.position = target;
+                } else {
+                    logs.unshift(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
+                }
+            } else if (snakes[player.position]) {
+                const target = snakes[player.position];
+                logs.unshift(`🧠 defense! <b>${player.name}</b> hit a snake. Answer correctly to block slide!`);
+                await updateDoc(roomDocRef, { logEvents: logs });
+
+                const passed = await triggerTriviaChallenge(player, false);
+                if (passed) {
+                    logs.unshift(`🛡️ Blocked! <b>${player.name}</b> successfully dodged sliding down the snake!`);
+                } else {
+                    logs.unshift(`❌ Incorrect! 🐍 <b>${player.name}</b> slid down to tile ${target}!`);
+                    player.position = target;
+                }
+            }
+
+            playersArray[index] = player;
+            const nextIdx = (index + 1) % playersArray.length;
+
+            if (player.position === 100) {
+                logs.unshift(`🏆 🏆 🏆 <b>${player.name} WINS THE GAME!</b> 🎉`);
+                await updateDoc(roomDocRef, {
+                    status: 'complete',
+                    players: playersArray,
+                    logEvents: logs
+                });
+                return;
+            }
+
+            await updateDoc(roomDocRef, {
+                players: playersArray,
+                currentPlayerIndex: nextIdx,
+                logEvents: logs
+            });
+        }
+
+        async function checkSnakeLadderLocal(index) {
+            let player = players[index];
+            
+            if (ladders[player.position]) {
+                const target = ladders[player.position];
+                logMessage(`🧠 quiz! <b>${player.name}</b> lands on a ladder. Answer correctly to climb!`);
+                
+                const passed = await triggerTriviaChallenge(player, true);
+                if (passed) {
+                    logMessage(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
+                    player.position = target;
+                    updateTokenPosition(index);
+                    await sleep(600);
+                } else {
+                    logMessage(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
+                }
+            } else if (snakes[player.position]) {
+                const target = snakes[player.position];
+                logMessage(`🧠 defense! <b>${player.name}</b> stepped on a snake. Answer correctly to block slide!`);
+                
+                const passed = await triggerTriviaChallenge(player, false);
+                if (passed) {
+                    logMessage(`🛡️ Safe! <b>${player.name}</b> successfully dodged sliding down the snake!`);
+                } else {
+                    logMessage(`❌ Incorrect! 🐍 <b>${player.name}</b> slid down to tile ${target}!`);
+                    player.position = target;
+                    updateTokenPosition(index);
+                    await sleep(600);
+                }
+            }
+
+            if (player.position === 100) {
+                logMessage("🏆 <b>" + player.name + " WINS THE GAME!</b> 🎉");
+                gameActive = false;
+                document.getElementById('dice-btn').disabled = true;
+                player.element.style.transform = "translate(-50%, -50%) scale(2)";
+                player.element.style.boxShadow = "0 0 20px gold";
+                return;
+            }
+
+            nextTurn();
         }
 
         function nextTurn() {
@@ -419,17 +1804,30 @@
             document.getElementById('dice-btn').disabled = false;
         }
 
-        function resetGame() {
-            document.getElementById('setup-area').style.display = 'flex';
-            document.getElementById('game-area').style.display = 'none';
-            document.getElementById('game-log').innerHTML = '';
-            document.getElementById('dice-result').innerText = '-';
+        window.quitActiveMatch = function() {
+            if (roomUnsubscribeListener) roomUnsubscribeListener();
+            document.getElementById('game-selection-panel').classList.remove('hidden');
+            document.getElementById('session-lobby-panel').classList.add('hidden');
+            document.getElementById('game-active-panel').classList.add('hidden');
+            document.getElementById('session-id-indicator').classList.add('hidden');
+            document.querySelectorAll('.token').forEach(t => t.remove());
+            
+            activeRoomId = null;
             createBoard();
-        }
+        };
 
-        // Initialize setup on window load
+        // Window resize listeners to update graphics dynamically
+        window.addEventListener('resize', () => {
+            drawSnakesAndLadders();
+            if (players.length > 0) {
+                players.forEach((p, index) => updateTokenPosition(index));
+            }
+        });
+
+        // Bootstrap on startup
         createBoard();
         generatePlayerInputs();
+        drawSnakesAndLadders();
     </script>
 </body>
 </html>
