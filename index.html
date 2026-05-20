@@ -97,9 +97,15 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.5);
             position: absolute;
             z-index: 10;
-            transition: top 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
+            transition: top 0.3s ease-in-out, left 0.3s ease-in-out, transform 0.15s ease, box-shadow 0.15s ease; 
             transform: translate(-50%, -50%);
             pointer-events: none;
+        }
+
+        .token.hopping {
+            transform: translate(-50%, -50%) scale(1.3) translateY(-8px);
+            box-shadow: 0 12px 16px rgba(0,0,0,0.4);
+            z-index: 20;
         }
 
         @media (max-width: 640px) {
@@ -107,6 +113,9 @@
                 width: 12px;
                 height: 12px;
                 border-width: 1px;
+            }
+            .token.hopping {
+                transform: translate(-50%, -50%) scale(1.3) translateY(-4px);
             }
         }
 
@@ -597,7 +606,11 @@
             
             switchTab('game');
             setGameMode('local');
-            startLocalGame();
+            
+            // Show setup panel instead of bypassing to start
+            document.getElementById('game-selection-panel').classList.remove('hidden');
+            document.getElementById('session-lobby-panel').classList.add('hidden');
+            document.getElementById('game-active-panel').classList.add('hidden');
         }
         window.startLocalGameFromTeacher = startLocalGameFromTeacher;
 
@@ -609,6 +622,7 @@
         }
         window.showAlert = showAlert;
 
+        // Force close local modal
         function closeAlert() {
             document.getElementById('custom-alert').classList.add('hidden');
         }
@@ -1011,6 +1025,9 @@
 
         // --- AUTHENTICATION FLOW SETUP ---
         const initAuth = async () => {
+            await auth.authStateReady();
+            if (auth.currentUser) return;
+
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     try {
@@ -1106,7 +1123,9 @@
         }
         window.handleAnonymousLogin = handleAnonymousLogin;
 
+        // Sign Out clean slate teardown (No lockup errors)
         function handleSignOut() {
+            // TEARDOWN ACTIVE SNAPSHOT LISTENER BEFORE CLOSING AUTHENTICATION CHANNELS
             if (collectionsUnsubscribe) {
                 collectionsUnsubscribe();
                 collectionsUnsubscribe = null;
@@ -1114,6 +1133,11 @@
             dbCollections = [];
             selectedCollectionId = null;
 
+            // Clear login form credentials
+            document.getElementById('teacher-email').value = '';
+            document.getElementById('teacher-password').value = '';
+
+            // Reset UI states
             document.getElementById('collection-detail').classList.add('hidden');
             document.getElementById('no-collection-selected').classList.remove('hidden');
 
@@ -1566,6 +1590,7 @@
         }
         window.openCsvModal = openCsvModal;
 
+        // Force Close Import Dialog
         function closeCsvModal() {
             document.getElementById('csv-import-modal').classList.add('hidden');
         }
@@ -1823,7 +1848,21 @@
                     return;
                 }
 
-                activePlayer.position = newPos;
+                // Step-by-step visual hopping animation locally before pushing state
+                for (let step = 0; step < roll; step++) {
+                    activePlayer.position += 1;
+                    if (players[rData.currentPlayerIndex]) {
+                        players[rData.currentPlayerIndex].position = activePlayer.position;
+                        players[rData.currentPlayerIndex].element.classList.add('hopping');
+                        updateTokenPosition(rData.currentPlayerIndex);
+                    }
+                    await sleep(150);
+                    if (players[rData.currentPlayerIndex]) {
+                        players[rData.currentPlayerIndex].element.classList.remove('hopping');
+                    }
+                    await sleep(150);
+                }
+
                 updatedPlayersArray[rData.currentPlayerIndex] = activePlayer;
 
                 await updateDoc(roomDocRef, {
@@ -1832,7 +1871,7 @@
                     logEvents: logs
                 });
 
-                await sleep(300);
+                await sleep(100);
                 await verifySnakeLadderCloud(rData.currentPlayerIndex, updatedPlayersArray, logs);
 
             } else {
@@ -1859,13 +1898,17 @@
 
                 logMessage(`▶️ <b>${player.name}</b> rolled a ${roll}.`);
                 
+                // Physical hopping animation for local mode
                 for (let step = 0; step < roll; step++) {
                     player.position += 1;
+                    player.element.classList.add('hopping');
                     updateTokenPosition(currentPlayerIndex);
-                    await sleep(300);
+                    await sleep(150);
+                    player.element.classList.remove('hopping');
+                    await sleep(150);
                 }
 
-                await sleep(200); 
+                await sleep(100); 
                 await checkSnakeLadderLocal(currentPlayerIndex);
             }
         }
@@ -1951,8 +1994,10 @@
                         player.position = target;
                         // Force immediate visual update to skip lag
                         if(players[index]) {
+                            players[index].element.classList.add('hopping');
                             players[index].position = target;
                             updateTokenPosition(index);
+                            setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                         }
                     } else {
                         logs.unshift(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
@@ -1961,8 +2006,10 @@
                     logs.unshift(`🚀 <b>${player.name}</b> climbed a ladder up to tile ${target}!`);
                     player.position = target;
                     if(players[index]) {
+                        players[index].element.classList.add('hopping');
                         players[index].position = target;
                         updateTokenPosition(index);
+                        setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                     }
                 }
             } else if (snakes[player.position]) {
@@ -1979,16 +2026,20 @@
                         logs.unshift(`❌ Incorrect! 🐍 <b>${player.name}</b> slid down to tile ${target}!`);
                         player.position = target;
                         if(players[index]) {
+                            players[index].element.classList.add('hopping');
                             players[index].position = target;
                             updateTokenPosition(index);
+                            setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                         }
                     }
                 } else {
                     logs.unshift(`🐍 Oh no! <b>${player.name}</b> slid down a snake to tile ${target}!`);
                     player.position = target;
                     if(players[index]) {
+                        players[index].element.classList.add('hopping');
                         players[index].position = target;
                         updateTokenPosition(index);
+                        setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                     }
                 }
             }
@@ -2027,7 +2078,9 @@
                     if (passed) {
                         logMessage(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
                         player.position = target;
+                        player.element.classList.add('hopping');
                         updateTokenPosition(index);
+                        setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                         await sleep(600);
                     } else {
                         logMessage(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
@@ -2035,7 +2088,9 @@
                 } else {
                     logMessage(`🚀 <b>${player.name}</b> climbed a ladder up to tile ${target}!`);
                     player.position = target;
+                    player.element.classList.add('hopping');
                     updateTokenPosition(index);
+                    setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                     await sleep(600);
                 }
             } else if (snakes[player.position]) {
@@ -2050,13 +2105,17 @@
                     } else {
                         logMessage(`❌ Incorrect! 🐍 <b>${player.name}</b> slid down to tile ${target}!`);
                         player.position = target;
+                        player.element.classList.add('hopping');
                         updateTokenPosition(index);
+                        setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                         await sleep(600);
                     }
                 } else {
                     logMessage(`🐍 Oh no! <b>${player.name}</b> slid down a snake to tile ${target}!`);
                     player.position = target;
+                    player.element.classList.add('hopping');
                     updateTokenPosition(index);
+                    setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                     await sleep(600);
                 }
             }
