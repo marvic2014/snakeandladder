@@ -50,20 +50,23 @@
         .cell {
             border: 1px solid #b2dfdb;
             display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
-            padding: 4px;
-            font-weight: bold;
-            font-size: 13px;
             box-sizing: border-box;
             color: #004d40;
             opacity: 0.85;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .cell-number {
+            font-weight: bold;
+            font-size: 13px;
+            padding: 4px 4px 0 4px;
         }
 
         @media (max-width: 640px) {
-            .cell {
+            .cell-number {
                 font-size: 8px;
-                padding: 1px;
+                padding: 2px 2px 0 2px;
             }
         }
 
@@ -302,7 +305,7 @@
                             Loading turn order...
                         </div>
 
-                        <button id="dice-btn" onclick="rollDice()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 disabled:opacity-50">
+                        <button id="dice-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 disabled:opacity-50">
                             <span>🎲 Roll Dice</span>
                         </button>
 
@@ -597,6 +600,19 @@
 
         const ladders = { 4: 14, 9: 31, 20: 38, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91 };
         const snakes = { 17: 7, 54: 34, 62: 18, 64: 60, 87: 24, 93: 73, 95: 75, 99: 78 };
+        
+        // NEW: Special Action Tiles
+        const specialActionTiles = {
+            12: { type: 'bonus', label: '⭐ Bonus Turn', color: 'text-amber-600' },
+            24: { type: 'back3', label: '🔙 -3 Steps', color: 'text-red-600' },
+            35: { type: 'lose1', label: '🛑 Miss Turn', color: 'text-rose-600' },
+            48: { type: 'bonus', label: '⭐ Bonus Turn', color: 'text-amber-600' },
+            61: { type: 'back3', label: '🔙 -3 Steps', color: 'text-red-600' },
+            77: { type: 'lose1', label: '🛑 Miss Turn', color: 'text-rose-600' },
+            85: { type: 'bonus', label: '⭐ Bonus Turn', color: 'text-amber-600' },
+            96: { type: 'back3', label: '🔙 -3 Steps', color: 'text-red-600' }
+        };
+
         const playerColors = ["#e53935", "#1e88e5", "#2e7d32", "#fdd835", "#8e24aa", "#fb8c00"];
         
         let players = [];
@@ -705,7 +721,13 @@
                     const cell = document.createElement('div');
                     cell.className = 'cell';
                     cell.id = `cell-${cellNumber}`;
-                    cell.innerHTML = `<span>${cellNumber}</span>`;
+                    
+                    let specialHtml = '';
+                    if (specialActionTiles[cellNumber]) {
+                        specialHtml = `<div class="w-full text-center pb-1 ${specialActionTiles[cellNumber].color} text-[8px] sm:text-[10px] leading-[1.1] font-extrabold uppercase">${specialActionTiles[cellNumber].label}</div>`;
+                    }
+                    
+                    cell.innerHTML = `<span class="cell-number">${cellNumber}</span>${specialHtml}`;
                     board.appendChild(cell);
                 }
             }
@@ -1024,7 +1046,58 @@
             const turnBox = document.getElementById('current-turn');
             turnBox.innerText = `Turn: ${current.name}`;
             turnBox.style.borderLeftColor = current.color;
+
+            // Handle button state for local game if skipped
+            if (!activeRoomId && gameActive) {
+                const diceBtn = document.getElementById('dice-btn');
+                if (current.skipTurns > 0) {
+                    diceBtn.onclick = processSkipTurn;
+                    diceBtn.innerText = "🛑 Skip Turn (Penalty)";
+                    diceBtn.className = "w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
+                    disableManualButtons(true);
+                } else {
+                    diceBtn.onclick = () => rollDice();
+                    diceBtn.innerText = "🎲 Roll Dice";
+                    diceBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
+                    disableManualButtons(false);
+                }
+            }
         }
+
+        window.processSkipTurn = async function() {
+            const diceBtn = document.getElementById('dice-btn');
+            diceBtn.disabled = true;
+            disableManualButtons(true);
+
+            if (activeRoomId) {
+                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
+                const snap = await getDoc(roomDocRef);
+                if (!snap.exists()) return;
+                const rData = snap.data();
+                
+                let updatedPlayersArray = [...rData.players];
+                let activePlayer = { ...updatedPlayersArray[rData.currentPlayerIndex] };
+                let logs = [...rData.logEvents];
+
+                logs.unshift(`⏩ <b>${activePlayer.name}</b> skipped their turn due to a penalty!`);
+                activePlayer.skipTurns = 0; 
+                updatedPlayersArray[rData.currentPlayerIndex] = activePlayer;
+
+                const nextIdx = (rData.currentPlayerIndex + 1) % rData.players.length;
+
+                await updateDoc(roomDocRef, {
+                    players: updatedPlayersArray,
+                    currentPlayerIndex: nextIdx,
+                    logEvents: logs
+                });
+            } else {
+                let player = players[currentPlayerIndex];
+                logMessage(`⏩ <b>${player.name}</b> skipped their turn due to a penalty!`);
+                player.skipTurns = 0;
+                await sleep(500); 
+                nextTurn();
+            }
+        };
 
         function logMessage(msg) {
             const log = document.getElementById('game-log');
@@ -1043,7 +1116,7 @@
             }
 
             const state = {
-                players: players.map(p => ({uid: p.uid, name: p.name, position: p.position, color: p.color})),
+                players: players.map(p => ({uid: p.uid, name: p.name, position: p.position, color: p.color, skipTurns: p.skipTurns || 0})),
                 currentPlayerIndex: currentPlayerIndex,
                 gameActive: gameActive,
                 gameDeck: gameDeck,
@@ -1117,9 +1190,6 @@
                         winPlayer.element.style.boxShadow = "0 0 20px gold";
                         winPlayer.element.style.zIndex = "30";
                     }
-                } else {
-                    document.getElementById('dice-btn').disabled = false;
-                    disableManualButtons(false);
                 }
 
                 return true;
@@ -1419,7 +1489,8 @@
                         uid: deviceUserId,
                         name: playerName,
                         position: 0,
-                        color: playerColors[roomData.players.length % playerColors.length]
+                        color: playerColors[roomData.players.length % playerColors.length],
+                        skipTurns: 0
                     };
 
                     const updatedPlayers = [...roomData.players, joinedPlayerObj];
@@ -1576,22 +1647,38 @@
                     }
                 }
             } else {
-                if (currentRole === 'teacher-host') {
-                    // Teacher is strictly a spectator in live sessions
-                    diceBtn.disabled = true;
-                    disableManualButtons(true);
-                    diceBtn.innerText = `👀 Spectating: ${currentRollPlayer.name}'s Turn`;
-                    diceBtn.className = "w-full bg-indigo-100 text-indigo-800 border-2 border-indigo-200 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
-                } else if (currentRollPlayer.uid === currentConnectedPlayerId) {
-                    diceBtn.disabled = false;
-                    disableManualButtons(false);
-                    diceBtn.innerText = "🎲 YOUR TURN: ROLL!";
-                    diceBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
+                if (currentRollPlayer.skipTurns > 0) {
+                    if (currentRole === 'teacher-host' || currentRollPlayer.uid === currentConnectedPlayerId) {
+                        diceBtn.disabled = false;
+                        disableManualButtons(true);
+                        diceBtn.onclick = processSkipTurn;
+                        diceBtn.innerText = "🛑 Skip Turn (Penalty)";
+                        diceBtn.className = "w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
+                    } else {
+                        diceBtn.disabled = true;
+                        disableManualButtons(true);
+                        diceBtn.innerText = `⌛ ${currentRollPlayer.name} is Skipping...`;
+                        diceBtn.className = "w-full bg-rose-200 text-rose-700 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
+                    }
                 } else {
-                    diceBtn.disabled = true;
-                    disableManualButtons(true);
-                    diceBtn.innerText = `⌛ Waiting for ${currentRollPlayer.name}`;
-                    diceBtn.className = "w-full bg-amber-200 text-amber-700 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
+                    if (currentRole === 'teacher-host') {
+                        // Teacher is strictly a spectator in live sessions
+                        diceBtn.disabled = true;
+                        disableManualButtons(true);
+                        diceBtn.innerText = `👀 Spectating: ${currentRollPlayer.name}'s Turn`;
+                        diceBtn.className = "w-full bg-indigo-100 text-indigo-800 border-2 border-indigo-200 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
+                    } else if (currentRollPlayer.uid === currentConnectedPlayerId) {
+                        diceBtn.disabled = false;
+                        disableManualButtons(false);
+                        diceBtn.onclick = () => rollDice();
+                        diceBtn.innerText = "🎲 YOUR TURN: ROLL!";
+                        diceBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
+                    } else {
+                        diceBtn.disabled = true;
+                        disableManualButtons(true);
+                        diceBtn.innerText = `⌛ Waiting for ${currentRollPlayer.name}`;
+                        diceBtn.className = "w-full bg-amber-200 text-amber-700 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
+                    }
                 }
             }
 
@@ -1936,6 +2023,7 @@
                 () => {
                     players.forEach((p, idx) => {
                         p.position = 0;
+                        p.skipTurns = 0;
                         if (p.element) {
                             // Strip victory size and shadows on reset
                             p.element.style.transform = "translate(-50%, -50%)";
@@ -1971,7 +2059,8 @@
                             const rData = snap.data();
                             const resetPlayers = rData.players.map(p => ({
                                 ...p,
-                                position: 0
+                                position: 0,
+                                skipTurns: 0
                             }));
                             await updateDoc(roomDocRef, {
                                 players: resetPlayers,
@@ -2040,6 +2129,7 @@
                     name: name,
                     position: 0,
                     color: playerColors[i-1],
+                    skipTurns: 0,
                     element: tokenEl
                 });
             }
@@ -2290,6 +2380,7 @@
             // Deep clone target object
             let player = { ...playersArray[index] };
             const hasQuestions = gameDeck && gameDeck.length > 0;
+            let bonusTurn = false;
 
             if (ladders[player.position]) {
                 const target = ladders[player.position];
@@ -2302,7 +2393,6 @@
                     if (passed) {
                         logs.unshift(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
                         player.position = target;
-                        // Force immediate visual update to skip lag
                         if(players[index]) {
                             players[index].element.classList.add('hopping');
                             players[index].position = target;
@@ -2352,10 +2442,28 @@
                         setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                     }
                 }
+            } else if (specialActionTiles[player.position]) {
+                const action = specialActionTiles[player.position];
+                if (action.type === 'bonus') {
+                    logs.unshift(`⭐ Awesome! <b>${player.name}</b> gets a Bonus Turn!`);
+                    bonusTurn = true;
+                } else if (action.type === 'lose1') {
+                    logs.unshift(`🛑 Oh no! <b>${player.name}</b> loses their next turn!`);
+                    player.skipTurns = 1;
+                } else if (action.type === 'back3') {
+                    logs.unshift(`🔙 Oops! <b>${player.name}</b> must go back 3 steps!`);
+                    player.position = Math.max(1, player.position - 3);
+                    if(players[index]) {
+                        players[index].element.classList.add('hopping');
+                        players[index].position = player.position;
+                        updateTokenPosition(index);
+                        setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
+                    }
+                }
             }
 
             playersArray[index] = player;
-            const nextIdx = (index + 1) % playersArray.length;
+            const nextIdx = bonusTurn ? index : ((index + 1) % playersArray.length);
 
             if (player.position === 100) {
                 logs.unshift(`🏆 🏆 🏆 <b>${player.name} WINS THE GAME!</b> 🎉`);
@@ -2377,6 +2485,7 @@
         async function checkSnakeLadderLocal(index) {
             let player = players[index];
             const hasQuestions = gameDeck && gameDeck.length > 0;
+            let bonusTurn = false;
             
             if (ladders[player.position]) {
                 const target = ladders[player.position];
@@ -2428,6 +2537,33 @@
                     setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                     await sleep(600);
                 }
+            } else if (specialActionTiles[player.position]) {
+                const action = specialActionTiles[player.position];
+                if (action.type === 'bonus') {
+                    logMessage(`⭐ Awesome! <b>${player.name}</b> gets a Bonus Turn!`);
+                    bonusTurn = true;
+                } else if (action.type === 'lose1') {
+                    logMessage(`🛑 Oh no! <b>${player.name}</b> loses their next turn!`);
+                    player.skipTurns = 1;
+                } else if (action.type === 'back3') {
+                    logMessage(`🔙 Oops! <b>${player.name}</b> must go back 3 steps!`);
+                    
+                    let pathSequence = [];
+                    let targetTile = Math.max(1, player.position - 3);
+                    for (let p = player.position - 1; p >= targetTile; p--) {
+                        pathSequence.push(p);
+                    }
+
+                    for (let step = 0; step < pathSequence.length; step++) {
+                        player.position = pathSequence[step];
+                        player.element.classList.add('hopping');
+                        updateTokenPosition(index);
+                        await sleep(150);
+                        player.element.classList.remove('hopping');
+                        await sleep(150);
+                    }
+                    await sleep(300);
+                }
             }
 
             if (player.position === 100) {
@@ -2442,15 +2578,27 @@
                 return;
             }
 
-            nextTurn();
+            if (bonusTurn) {
+                // Keep the turn on current player
+                updateTurnUI();
+                document.getElementById('dice-btn').disabled = false;
+                disableManualButtons(false);
+                if (!activeRoomId) saveLocalSession();
+            } else {
+                nextTurn();
+            }
         }
 
         function nextTurn() {
             currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
             updateTurnUI();
-            document.getElementById('dice-btn').disabled = false;
-            disableManualButtons(false);
-            if (!activeRoomId) saveLocalSession();
+            
+            // Note: If the next player has skipTurns > 0, updateTurnUI changes their roll button to a "Skip Turn" button.
+            if (!activeRoomId) {
+                document.getElementById('dice-btn').disabled = false;
+                if(players[currentPlayerIndex].skipTurns === 0) disableManualButtons(false);
+                saveLocalSession();
+            }
         }
 
         function quitActiveMatch() {
