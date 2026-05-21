@@ -454,10 +454,25 @@
             </div>
         </div>
 
+        <!-- MODAL: EDIT DECK -->
+        <div id="edit-collection-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                <h3 class="text-lg font-bold text-slate-900 mb-4">Rename Deck</h3>
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-600 mb-1">Deck Title</label>
+                    <input type="text" id="edit-collection-name" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button onclick="closeEditCollectionModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg transition font-semibold">Cancel</button>
+                    <button onclick="submitEditCollection()" class="bg-purple-950 hover:bg-purple-900 text-white px-4 py-2 rounded-lg transition font-semibold">Save</button>
+                </div>
+            </div>
+        </div>
+
         <!-- MODAL: CARD CREATOR -->
         <div id="manual-question-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
             <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
-                <h3 class="text-lg font-bold text-slate-900 mb-4">Add Trivia Card</h3>
+                <h3 id="question-modal-title" class="text-lg font-bold text-slate-900 mb-4">Add Trivia Card</h3>
                 <div class="space-y-3">
                     <div>
                         <label class="block text-sm font-semibold text-slate-600 mb-1">Question</label>
@@ -493,7 +508,7 @@
                 </div>
                 <div class="flex justify-end gap-2 mt-6">
                     <button onclick="closeManualQuestionModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg transition font-semibold">Cancel</button>
-                    <button onclick="submitManualQuestion()" class="bg-purple-950 hover:bg-purple-900 text-white px-4 py-2 rounded-lg transition font-semibold">Save Card</button>
+                    <button id="question-modal-btn" onclick="submitManualQuestion()" class="bg-purple-950 hover:bg-purple-900 text-white px-4 py-2 rounded-lg transition font-semibold">Save Card</button>
                 </div>
             </div>
         </div>
@@ -575,6 +590,8 @@
         let currentPlayerIndex = 0;
         let gameActive = false;
         let gameDeck = [];
+        let editingCollectionId = null;
+        let editingQuestionIndex = null;
 
         // --- DECLARE LOCAL MODULE FUNCTIONS ---
 
@@ -708,13 +725,19 @@
                 const isSelected = col.id === selectedCollectionId;
                 const style = isSelected ? 'bg-purple-100 border-purple-950 text-purple-950' : 'bg-slate-50 border-slate-200 text-slate-700';
                 
+                // Escape quotes for onclick strings
+                const safeName = col.name.replace(/'/g, "\\'");
+
                 container.innerHTML += `
                     <div class="p-3 rounded-lg border flex justify-between items-center cursor-pointer ${style}" onclick="selectCollection('${col.id}')">
                         <div class="flex-1 min-w-0">
                             <h4 class="font-bold truncate text-sm">${col.name}</h4>
                             <p class="text-xs text-slate-500">${col.questions ? col.questions.length : 0} questions</p>
                         </div>
-                        <button onclick="event.stopPropagation(); deleteCollection('${col.id}')" class="text-red-600 hover:text-red-800 p-1 text-xs">🗑️</button>
+                        <div class="flex items-center gap-1">
+                            <button onclick="event.stopPropagation(); openEditCollectionModal('${col.id}', '${safeName}')" class="text-blue-600 hover:text-blue-800 p-1 text-xs" title="Rename Deck">✏️</button>
+                            <button onclick="event.stopPropagation(); deleteCollection('${col.id}')" class="text-red-600 hover:text-red-800 p-1 text-xs" title="Delete Deck">🗑️</button>
+                        </div>
                     </div>
                 `;
             });
@@ -1466,7 +1489,10 @@
             list.forEach((q, idx) => {
                 listEl.innerHTML += `
                     <div class="p-4 rounded-lg bg-slate-50 border border-slate-200 relative">
-                        <button onclick="deleteQuestion(${idx})" class="absolute top-3 right-3 text-sm hover:scale-110 transition text-red-600">❌</button>
+                        <div class="absolute top-3 right-3 flex gap-2">
+                            <button onclick="openManualQuestionModal(${idx})" class="text-sm hover:scale-110 transition text-blue-600" title="Edit Question">✏️</button>
+                            <button onclick="deleteQuestion(${idx})" class="text-sm hover:scale-110 transition text-red-600" title="Delete Question">❌</button>
+                        </div>
                         <span class="text-xs font-bold text-purple-900 bg-purple-100 px-2 py-0.5 rounded">Card ${idx + 1}</span>
                         <p class="font-bold text-slate-800 mt-1 mb-2 text-sm">${q.question}</p>
                         <div class="grid grid-cols-2 gap-2 text-xs text-slate-600">
@@ -1536,13 +1562,76 @@
         }
         window.deleteCollection = deleteCollection;
 
-        function openManualQuestionModal() {
+        function openEditCollectionModal(colId, currentName) {
+            editingCollectionId = colId;
+            document.getElementById('edit-collection-name').value = currentName;
+            document.getElementById('edit-collection-modal').classList.remove('hidden');
+        }
+        window.openEditCollectionModal = openEditCollectionModal;
+
+        function closeEditCollectionModal() {
+            document.getElementById('edit-collection-modal').classList.add('hidden');
+            editingCollectionId = null;
+            document.getElementById('edit-collection-name').value = '';
+        }
+        window.closeEditCollectionModal = closeEditCollectionModal;
+
+        function submitEditCollection() {
+            const newName = document.getElementById('edit-collection-name').value.trim();
+            if (!newName || !editingCollectionId) return;
+            if (!currentUser || currentUser.isAnonymous) return;
+
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', editingCollectionId);
+            updateDoc(docRef, { name: newName })
+                .then(() => {
+                    closeEditCollectionModal();
+                    if (selectedCollectionId === editingCollectionId) {
+                        document.getElementById('current-col-title').innerText = newName;
+                    }
+                })
+                .catch((err) => {
+                    showAlert("Error", "Could not rename deck: " + err.message);
+                });
+        }
+        window.submitEditCollection = submitEditCollection;
+
+        function openManualQuestionModal(idx = null) {
+            editingQuestionIndex = idx;
+            const title = document.getElementById('question-modal-title');
+            const btn = document.getElementById('question-modal-btn');
+
+            if (idx !== null) {
+                title.innerText = "Edit Trivia Card";
+                btn.innerText = "Update Card";
+                
+                const colObj = dbCollections.find(c => c.id === selectedCollectionId);
+                if (colObj && colObj.questions) {
+                    const q = colObj.questions[idx];
+                    document.getElementById('manual-prompt').value = q.question;
+                    document.getElementById('manual-a').value = q.a;
+                    document.getElementById('manual-b').value = q.b;
+                    document.getElementById('manual-c').value = q.c;
+                    document.getElementById('manual-d').value = q.d;
+                    document.getElementById('manual-correct').value = q.correct;
+                }
+            } else {
+                title.innerText = "Add Trivia Card";
+                btn.innerText = "Save Card";
+                document.getElementById('manual-prompt').value = '';
+                document.getElementById('manual-a').value = '';
+                document.getElementById('manual-b').value = '';
+                document.getElementById('manual-c').value = '';
+                document.getElementById('manual-d').value = '';
+                document.getElementById('manual-correct').value = 'A';
+            }
+            
             document.getElementById('manual-question-modal').classList.remove('hidden');
         }
         window.openManualQuestionModal = openManualQuestionModal;
 
         function closeManualQuestionModal() {
             document.getElementById('manual-question-modal').classList.add('hidden');
+            editingQuestionIndex = null;
         }
         window.closeManualQuestionModal = closeManualQuestionModal;
 
@@ -1559,18 +1648,30 @@
 
             const newCard = { question, a, b, c, d, correct };
             const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', selectedCollectionId);
-            updateDoc(docRef, { questions: arrayUnion(newCard) })
-                .then(() => {
-                    document.getElementById('manual-prompt').value = '';
-                    document.getElementById('manual-a').value = '';
-                    document.getElementById('manual-b').value = '';
-                    document.getElementById('manual-c').value = '';
-                    document.getElementById('manual-d').value = '';
-                    closeManualQuestionModal();
-                })
-                .catch((err) => {
-                    showAlert("Error", "Could not add card: " + err.message);
-                });
+            
+            if (editingQuestionIndex !== null) {
+                const colObj = dbCollections.find(c => c.id === selectedCollectionId);
+                if (!colObj) return;
+                
+                const list = [...colObj.questions];
+                list[editingQuestionIndex] = newCard;
+                
+                updateDoc(docRef, { questions: list })
+                    .then(() => {
+                        closeManualQuestionModal();
+                    })
+                    .catch((err) => {
+                        showAlert("Error", "Could not update card: " + err.message);
+                    });
+            } else {
+                updateDoc(docRef, { questions: arrayUnion(newCard) })
+                    .then(() => {
+                        closeManualQuestionModal();
+                    })
+                    .catch((err) => {
+                        showAlert("Error", "Could not add card: " + err.message);
+                    });
+            }
         }
         window.submitManualQuestion = submitManualQuestion;
 
