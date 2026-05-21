@@ -1033,6 +1033,103 @@
             log.prepend(entry);
         }
 
+        function saveLocalSession() {
+            if (activeRoomId) return; // Only save local modes
+            
+            const logNodes = document.getElementById('game-log').children;
+            const logEvents = [];
+            for (let i = 0; i < logNodes.length; i++) {
+                logEvents.push(logNodes[i].innerHTML);
+            }
+
+            const state = {
+                players: players.map(p => ({uid: p.uid, name: p.name, position: p.position, color: p.color})),
+                currentPlayerIndex: currentPlayerIndex,
+                gameActive: gameActive,
+                gameDeck: gameDeck,
+                logEvents: logEvents,
+                diceResult: document.getElementById('dice-result').innerText
+            };
+            localStorage.setItem('localGameState', JSON.stringify(state));
+        }
+        window.saveLocalSession = saveLocalSession;
+
+        function loadLocalSession() {
+            const saved = localStorage.getItem('localGameState');
+            if (!saved) return false;
+
+            try {
+                const state = JSON.parse(saved);
+                if (!state.players || state.players.length === 0) return false;
+
+                currentPlayerIndex = state.currentPlayerIndex;
+                gameActive = state.gameActive;
+                gameDeck = state.gameDeck || [];
+                activeRoomId = null;
+                currentRole = 'teacher-host';
+                activeDeviceMode = 'local';
+
+                document.querySelectorAll('.token').forEach(t => t.remove());
+                players = [];
+                const board = document.getElementById('board');
+                
+                state.players.forEach((p, i) => {
+                    let tokenEl = document.createElement('div');
+                    tokenEl.className = 'token';
+                    tokenEl.style.backgroundColor = p.color;
+                    board.appendChild(tokenEl);
+
+                    players.push({
+                        ...p,
+                        element: tokenEl
+                    });
+                    updateTokenPosition(i);
+                });
+
+                switchTab('game');
+                setGameMode('local');
+                document.getElementById('game-selection-panel').classList.add('hidden');
+                document.getElementById('session-lobby-panel').classList.add('hidden');
+                document.getElementById('game-active-panel').classList.remove('hidden');
+
+                document.getElementById('dice-result').innerText = state.diceResult || '-';
+                
+                const log = document.getElementById('game-log');
+                log.innerHTML = '';
+                if (state.logEvents) {
+                    state.logEvents.forEach(msg => {
+                        const entry = document.createElement('div');
+                        entry.innerHTML = msg;
+                        log.appendChild(entry);
+                    });
+                }
+
+                updateTurnUI();
+                drawSnakesAndLadders();
+                renderControlButtons();
+
+                if (!gameActive) {
+                    document.getElementById('dice-btn').disabled = true;
+                    disableManualButtons(true);
+                    const winPlayer = players.find(p => p.position === 100);
+                    if (winPlayer) {
+                        winPlayer.element.style.transform = "translate(-50%, -50%) scale(2)";
+                        winPlayer.element.style.boxShadow = "0 0 20px gold";
+                        winPlayer.element.style.zIndex = "30";
+                    }
+                } else {
+                    document.getElementById('dice-btn').disabled = false;
+                    disableManualButtons(false);
+                }
+
+                return true;
+            } catch (err) {
+                console.error("Error loading local session:", err);
+                return false;
+            }
+        }
+        window.loadLocalSession = loadLocalSession;
+
         // --- CLOUD FIREBASE ACCESS METHODS ---
         let collectionsUnsubscribe = null;
 
@@ -1855,6 +1952,7 @@
                     disableManualButtons(false);
                     updateTurnUI();
                     logMessage("🔄 Game reset! All players are back at the start.");
+                    saveLocalSession();
                 }
             );
         }
@@ -1965,6 +2063,7 @@
             
             // Build Controls
             renderControlButtons();
+            saveLocalSession();
         }
         window.startLocalGame = startLocalGame;
 
@@ -2339,6 +2438,7 @@
                 player.element.style.transform = "translate(-50%, -50%) scale(2)";
                 player.element.style.boxShadow = "0 0 20px gold";
                 player.element.style.zIndex = "30";
+                if (!activeRoomId) saveLocalSession();
                 return;
             }
 
@@ -2350,10 +2450,12 @@
             updateTurnUI();
             document.getElementById('dice-btn').disabled = false;
             disableManualButtons(false);
+            if (!activeRoomId) saveLocalSession();
         }
 
         function quitActiveMatch() {
             if (roomUnsubscribeListener) roomUnsubscribeListener();
+            localStorage.removeItem('localGameState');
             document.getElementById('game-selection-panel').classList.remove('hidden');
             document.getElementById('session-lobby-panel').classList.add('hidden');
             document.getElementById('game-active-panel').classList.add('hidden');
@@ -2399,6 +2501,7 @@
             createBoard();
             generatePlayerInputs();
             drawSnakesAndLadders();
+            loadLocalSession();
         } catch (e) {
             console.error("Board rendering error on startup:", e);
         }
