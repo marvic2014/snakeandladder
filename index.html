@@ -601,7 +601,7 @@
         const ladders = { 4: 14, 9: 31, 20: 38, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91 };
         const snakes = { 17: 7, 54: 34, 62: 18, 64: 60, 87: 24, 93: 73, 95: 75, 99: 78 };
         
-        // NEW: Special Action Tiles
+        // Special Action Tiles
         const specialActionTiles = {
             12: { type: 'bonus', label: '⭐ Bonus Turn', color: 'text-amber-600' },
             24: { type: 'back3', label: '🔙 -3 Steps', color: 'text-red-600' },
@@ -2382,6 +2382,9 @@
             const hasQuestions = gameDeck && gameDeck.length > 0;
             let bonusTurn = false;
 
+            // Flags to determine if we need to recursively check again (e.g. after a slide/ladder)
+            let checkSpecialTileAfterMovement = false;
+
             if (ladders[player.position]) {
                 const target = ladders[player.position];
                 
@@ -2393,12 +2396,14 @@
                     if (passed) {
                         logs.unshift(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
                         player.position = target;
+                        // Force immediate visual update to skip lag
                         if(players[index]) {
                             players[index].element.classList.add('hopping');
                             players[index].position = target;
                             updateTokenPosition(index);
                             setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                         }
+                        checkSpecialTileAfterMovement = true;
                     } else {
                         logs.unshift(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
                     }
@@ -2411,6 +2416,7 @@
                         updateTokenPosition(index);
                         setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                     }
+                    checkSpecialTileAfterMovement = true;
                 }
             } else if (snakes[player.position]) {
                 const target = snakes[player.position];
@@ -2431,6 +2437,7 @@
                             updateTokenPosition(index);
                             setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                         }
+                        checkSpecialTileAfterMovement = true;
                     }
                 } else {
                     logs.unshift(`🐍 Oh no! <b>${player.name}</b> slid down a snake to tile ${target}!`);
@@ -2441,6 +2448,7 @@
                         updateTokenPosition(index);
                         setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                     }
+                    checkSpecialTileAfterMovement = true;
                 }
             } else if (specialActionTiles[player.position]) {
                 const action = specialActionTiles[player.position];
@@ -2459,10 +2467,19 @@
                         updateTokenPosition(index);
                         setTimeout(() => { if (players[index]) players[index].element.classList.remove('hopping'); }, 300);
                     }
+                    // RECURSIVE CHECK: Check if the player landed on a snake (e.g. 93) after moving back 3 steps!
+                    checkSpecialTileAfterMovement = true;
                 }
             }
 
             playersArray[index] = player;
+
+            // If we need to recursively check for snakes/ladders/specials on landing tile
+            if (checkSpecialTileAfterMovement) {
+                await verifySnakeLadderCloud(index, playersArray, logs);
+                return;
+            }
+
             const nextIdx = bonusTurn ? index : ((index + 1) % playersArray.length);
 
             if (player.position === 100) {
@@ -2486,6 +2503,7 @@
             let player = players[index];
             const hasQuestions = gameDeck && gameDeck.length > 0;
             let bonusTurn = false;
+            let checkSpecialTileAfterMovement = false;
             
             if (ladders[player.position]) {
                 const target = ladders[player.position];
@@ -2501,6 +2519,7 @@
                         updateTokenPosition(index);
                         setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                         await sleep(600);
+                        checkSpecialTileAfterMovement = true;
                     } else {
                         logMessage(`❌ Incorrect! <b>${player.name}</b> remains on tile ${player.position}.`);
                     }
@@ -2511,6 +2530,7 @@
                     updateTokenPosition(index);
                     setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                     await sleep(600);
+                    checkSpecialTileAfterMovement = true;
                 }
             } else if (snakes[player.position]) {
                 const target = snakes[player.position];
@@ -2528,6 +2548,7 @@
                         updateTokenPosition(index);
                         setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                         await sleep(600);
+                        checkSpecialTileAfterMovement = true;
                     }
                 } else {
                     logMessage(`🐍 Oh no! <b>${player.name}</b> slid down a snake to tile ${target}!`);
@@ -2536,6 +2557,7 @@
                     updateTokenPosition(index);
                     setTimeout(() => { if (player.element) player.element.classList.remove('hopping'); }, 300);
                     await sleep(600);
+                    checkSpecialTileAfterMovement = true;
                 }
             } else if (specialActionTiles[player.position]) {
                 const action = specialActionTiles[player.position];
@@ -2563,6 +2585,9 @@
                         await sleep(150);
                     }
                     await sleep(300);
+                    
+                    // RECURSIVE CHECK: Check if landing tile has snake (such as 93 after bouncing from 96!)
+                    checkSpecialTileAfterMovement = true;
                 }
             }
 
@@ -2575,6 +2600,12 @@
                 player.element.style.boxShadow = "0 0 20px gold";
                 player.element.style.zIndex = "30";
                 if (!activeRoomId) saveLocalSession();
+                return;
+            }
+
+            // Execute the recursive check on landing tile before switching turns
+            if (checkSpecialTileAfterMovement) {
+                await checkSnakeLadderLocal(index);
                 return;
             }
 
