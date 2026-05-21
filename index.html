@@ -1979,6 +1979,22 @@
                 let timeLeft = 15;
                 document.getElementById('timer-sec').innerText = timeLeft;
 
+                const finish = (key) => {
+                    if (answered) return;
+                    answered = true;
+                    clearInterval(timerInterval);
+                    modal.classList.add('hidden');
+                    
+                    // Robust string matching to prevent hidden formatting bugs:
+                    // Checks if the user selected either the correct letter (e.g., 'B') or the correct answer's exact text (e.g., '56')
+                    const correctTarget = randQ.correct ? String(randQ.correct).trim().toUpperCase() : '';
+                    const chosenLetter = key ? String(key).trim().toUpperCase() : '';
+                    const chosenText = map[key] ? String(map[key]).trim().toUpperCase() : '';
+                    
+                    const isCorrect = (chosenLetter === correctTarget) || (chosenText === correctTarget);
+                    resolve(isCorrect);
+                };
+
                 const timerInterval = setInterval(() => {
                     timeLeft--;
                     document.getElementById('timer-sec').innerText = timeLeft;
@@ -1986,16 +2002,6 @@
                         finish(null);
                     }
                 }, 1000);
-
-                const finish = (key) => {
-                    if (answered) return;
-                    answered = true;
-                    clearInterval(timerInterval);
-                    modal.classList.add('hidden');
-                    // Robust string matching to prevent hidden formatting bugs
-                    const isCorrect = key !== null && String(key).trim().toUpperCase() === String(randQ.correct).trim().toUpperCase();
-                    resolve(isCorrect);
-                };
 
                 for (let k in map) {
                     const btn = document.createElement('button');
