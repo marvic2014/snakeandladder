@@ -311,10 +311,16 @@
 
                         <div id="dice-result" class="text-center font-extrabold text-slate-800 text-4xl py-2 min-h-[50px]">-</div>
 
-                        <!-- Manual Dice Controls -->
-                        <div id="manual-dice-controls" class="border-t border-slate-200 pt-3">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 text-center">Physical Dice Input</h3>
-                            <div class="flex justify-center gap-1.5 sm:gap-2">
+                        <!-- Manual Dice Controls with Toggle -->
+                        <div class="border-t border-slate-200 pt-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider m-0">Physical / Manual Dice</h3>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="toggle-manual-dice" class="sr-only peer" onchange="toggleManualDice(this)">
+                                    <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500"></div>
+                                </label>
+                            </div>
+                            <div id="manual-dice-buttons" class="flex justify-center gap-1.5 sm:gap-2 hidden">
                                 <button onclick="manualRoll(1)" class="manual-roll-btn w-10 h-10 bg-white border-2 border-slate-300 hover:border-amber-500 hover:text-amber-600 rounded-lg font-bold text-slate-600 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">1</button>
                                 <button onclick="manualRoll(2)" class="manual-roll-btn w-10 h-10 bg-white border-2 border-slate-300 hover:border-amber-500 hover:text-amber-600 rounded-lg font-bold text-slate-600 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">2</button>
                                 <button onclick="manualRoll(3)" class="manual-roll-btn w-10 h-10 bg-white border-2 border-slate-300 hover:border-amber-500 hover:text-amber-600 rounded-lg font-bold text-slate-600 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">3</button>
@@ -521,6 +527,10 @@
                             <option value="D">Option D</option>
                         </select>
                     </div>
+                    <div class="mt-2 flex items-center gap-2 border-t pt-3">
+                        <input type="checkbox" id="manual-difficult" class="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer">
+                        <label for="manual-difficult" class="text-sm font-bold text-orange-600 cursor-pointer">🔥 Mark as Difficult</label>
+                    </div>
                 </div>
                 <div class="flex justify-end gap-2 mt-6">
                     <button onclick="closeManualQuestionModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg transition font-semibold">Cancel</button>
@@ -536,7 +546,7 @@
                 <p class="text-xs text-slate-500 mb-4">
                     Must match format with exact headers: <br>
                     <code class="block bg-slate-100 p-2 rounded mt-1 overflow-x-auto text-[11px] text-purple-950 font-mono">
-                        Question,Option A,Option B,Option C,Option D,Correct (A/B/C/D)
+                        Question,Option A,Option B,Option C,Option D,Correct (A/B/C/D),Difficult (YES/NO)
                     </code>
                 </p>
                 <div class="mb-6">
@@ -590,11 +600,11 @@
             id: 'default-math',
             name: 'Default Math Flashcards',
             questions: [
-                { question: "What is 7 x 8?", a: "54", b: "56", c: "64", d: "48", correct: "B" },
-                { question: "What is 120 / 10?", a: "10", b: "11", c: "12", d: "14", correct: "C" },
-                { question: "Simplify: 5 + (3 x 4)", a: "32", b: "17", c: "27", d: "20", correct: "B" },
-                { question: "Which is a prime number?", a: "9", b: "15", c: "17", d: "21", correct: "C" },
-                { question: "What is half of 74?", a: "37", b: "35", c: "38", d: "36", correct: "A" }
+                { question: "What is 7 x 8?", a: "54", b: "56", c: "64", d: "48", correct: "B", difficult: false },
+                { question: "What is 120 / 10?", a: "10", b: "11", c: "12", d: "14", correct: "C", difficult: false },
+                { question: "Simplify: 5 + (3 x 4)", a: "32", b: "17", c: "27", d: "20", correct: "B", difficult: true },
+                { question: "Which is a prime number?", a: "9", b: "15", c: "17", d: "21", correct: "C", difficult: true },
+                { question: "What is half of 74?", a: "37", b: "35", c: "38", d: "36", correct: "A", difficult: false }
             ]
         };
 
@@ -623,6 +633,15 @@
         let editingQuestionIndex = null;
 
         // --- DECLARE LOCAL MODULE FUNCTIONS ---
+
+        window.toggleManualDice = function(checkbox) {
+            const container = document.getElementById('manual-dice-buttons');
+            if (checkbox.checked) {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+        };
 
         function disableManualButtons(disabled) {
             document.querySelectorAll('.manual-roll-btn').forEach(btn => {
@@ -1717,14 +1736,18 @@
             }
 
             list.forEach((q, idx) => {
+                const diffBadge = q.difficult ? `<span class="text-[10px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded ml-1">🔥 Hard</span>` : '';
                 listEl.innerHTML += `
                     <div class="p-4 rounded-lg bg-slate-50 border border-slate-200 relative">
                         <div class="absolute top-3 right-3 flex gap-2">
                             <button onclick="openManualQuestionModal(${idx})" class="text-sm hover:scale-110 transition text-blue-600" title="Edit Question">✏️</button>
                             <button onclick="deleteQuestion(${idx})" class="text-sm hover:scale-110 transition text-red-600" title="Delete Question">❌</button>
                         </div>
-                        <span class="text-xs font-bold text-purple-900 bg-purple-100 px-2 py-0.5 rounded">Card ${idx + 1}</span>
-                        <p class="font-bold text-slate-800 mt-1 mb-2 text-sm">${q.question}</p>
+                        <div class="flex items-center gap-1 mb-1">
+                            <span class="text-xs font-bold text-purple-900 bg-purple-100 px-2 py-0.5 rounded">Card ${idx + 1}</span>
+                            ${diffBadge}
+                        </div>
+                        <p class="font-bold text-slate-800 mb-2 text-sm">${q.question}</p>
                         <div class="grid grid-cols-2 gap-2 text-xs text-slate-600">
                             <div class="${q.correct === 'A' ? 'font-bold text-emerald-600' : ''}">A: ${q.a}</div>
                             <div class="${q.correct === 'B' ? 'font-bold text-emerald-600' : ''}">B: ${q.b}</div>
@@ -1843,6 +1866,7 @@
                     document.getElementById('manual-c').value = q.c;
                     document.getElementById('manual-d').value = q.d;
                     document.getElementById('manual-correct').value = q.correct;
+                    document.getElementById('manual-difficult').checked = q.difficult || false;
                 }
             } else {
                 title.innerText = "Add Trivia Card";
@@ -1853,6 +1877,7 @@
                 document.getElementById('manual-c').value = '';
                 document.getElementById('manual-d').value = '';
                 document.getElementById('manual-correct').value = 'A';
+                document.getElementById('manual-difficult').checked = false;
             }
             
             document.getElementById('manual-question-modal').classList.remove('hidden');
@@ -1872,11 +1897,12 @@
             const c = document.getElementById('manual-c').value.trim();
             const d = document.getElementById('manual-d').value.trim();
             const correct = document.getElementById('manual-correct').value;
+            const difficult = document.getElementById('manual-difficult').checked;
 
             if (!question || !a || !b || !c || !d) return;
             if (!currentUser || currentUser.isAnonymous) return;
 
-            const newCard = { question, a, b, c, d, correct };
+            const newCard = { question, a, b, c, d, correct, difficult };
             const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'questionCollections', selectedCollectionId);
             
             if (editingQuestionIndex !== null) {
@@ -1950,14 +1976,19 @@
                     const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     if (cols.length < 6) continue;
 
-                    const clean = (s) => s.replace(/^"|"$/g, '').trim();
+                    const clean = (s) => s ? s.replace(/^"|"$/g, '').trim() : '';
+                    
+                    const isDiffRaw = clean(cols[6]).toUpperCase();
+                    const isDiff = (isDiffRaw === 'YES' || isDiffRaw === 'TRUE' || isDiffRaw === '1');
+
                     parsed.push({
                         question: clean(cols[0]),
                         a: clean(cols[1]),
                         b: clean(cols[2]),
                         c: clean(cols[3]),
                         d: clean(cols[4]),
-                        correct: clean(cols[5]).toUpperCase()
+                        correct: clean(cols[5]).toUpperCase(),
+                        difficult: isDiff
                     });
                 }
 
@@ -2195,10 +2226,12 @@
                 logs.unshift(`🎲 <b>${activePlayer.name}</b> rolled a ${roll}.`);
 
                 let pathSequence = [];
+                let bounceBackTarget = null;
+
                 // Calculate bounce-back path
                 if (calculatedTarget > 100) {
                     let excess = calculatedTarget - 100;
-                    let bounceBackTarget = 100 - excess;
+                    bounceBackTarget = 100 - excess;
                     logs.unshift(`↩️ <b>${activePlayer.name}</b> bounced back ${excess} space(s) from tile 100.`);
 
                     // Forward steps up to 100
@@ -2242,7 +2275,7 @@
                 });
 
                 await sleep(100);
-                await verifySnakeLadderCloud(rData.currentPlayerIndex, updatedPlayersArray, logs);
+                await verifySnakeLadderCloud(rData.currentPlayerIndex, updatedPlayersArray, logs, bounceBackTarget);
 
             } else {
                 if (!gameActive) return;
@@ -2269,9 +2302,11 @@
                 logMessage(`▶️ <b>${player.name}</b> rolled a ${roll}.`);
 
                 let pathSequence = [];
+                let bounceBackTarget = null;
+
                 if (calculatedTarget > 100) {
                     let excess = calculatedTarget - 100;
-                    let bounceBackTarget = 100 - excess;
+                    bounceBackTarget = 100 - excess;
                     logMessage(`↩️ <b>${player.name}</b> bounced back ${excess} space(s) from tile 100.`);
 
                     for (let p = oldPos + 1; p <= 100; p++) {
@@ -2303,24 +2338,28 @@
                 updateTokenPosition(currentPlayerIndex);
 
                 await sleep(100); 
-                await checkSnakeLadderLocal(currentPlayerIndex);
+                await checkSnakeLadderLocal(currentPlayerIndex, bounceBackTarget);
             }
         }
         window.rollDice = rollDice;
 
         // --- REAL-TIME TRIVIA DECISION MODALS ---
-        async function triggerTriviaChallenge(player, isLadder) {
+        async function triggerTriviaChallenge(player, challengeType, specificPool = null, currentNum = 1, totalNum = 1) {
             return new Promise((resolve) => {
-                if (gameDeck.length === 0) {
-                    resolve(isLadder); 
+                const pool = specificPool && specificPool.length > 0 ? specificPool : gameDeck;
+                if (pool.length === 0) {
+                    resolve(challengeType === 'ladder' || challengeType === 'ultimate'); 
                     return;
                 }
 
-                const randQ = gameDeck[Math.floor(Math.random() * gameDeck.length)];
+                const randQ = pool[Math.floor(Math.random() * pool.length)];
                 const modal = document.getElementById('trivia-modal');
                 const badge = document.getElementById('trivia-type-badge');
                 
-                if (isLadder) {
+                if (challengeType === 'ultimate') {
+                    badge.innerText = `🔥 ULTIMATE CHALLENGE (${currentNum}/${totalNum})!`;
+                    badge.className = "bg-orange-100 text-orange-800 font-bold px-3 py-1 rounded-full text-sm";
+                } else if (challengeType === 'ladder' || challengeType === true) {
                     badge.innerText = "🚀 LADDER CHALLENGE!";
                     badge.className = "bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full text-sm";
                 } else {
@@ -2375,7 +2414,7 @@
             });
         }
 
-        async function verifySnakeLadderCloud(index, playersArray, logs) {
+        async function verifySnakeLadderCloud(index, playersArray, logs, bouncedToTarget = null) {
             const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', activeRoomId);
             // Deep clone target object
             let player = { ...playersArray[index] };
@@ -2385,14 +2424,45 @@
             // Flags to determine if we need to recursively check again (e.g. after a slide/ladder)
             let checkSpecialTileAfterMovement = false;
 
-            if (ladders[player.position]) {
+            if (hasQuestions && (bouncedToTarget === 97 || bouncedToTarget === 98)) {
+                logs.unshift(`🔥 <b>${player.name}</b> landed on ${bouncedToTarget} and triggered the ULTIMATE CHALLENGE!`);
+                await updateDoc(roomDocRef, { logEvents: logs });
+
+                const diffQs = gameDeck.filter(q => q.difficult);
+                const pool = diffQs.length > 0 ? diffQs : gameDeck;
+                let targetCount = Math.min(5, pool.length);
+                let passedAll = true;
+
+                for(let i = 0; i < targetCount; i++) {
+                    const passed = await triggerTriviaChallenge(player, 'ultimate', pool, i+1, targetCount);
+                    if (!passed) {
+                        passedAll = false;
+                        break;
+                    }
+                }
+
+                if (passedAll) {
+                    logs.unshift(`🌟 <b>${player.name}</b> conquered the Ultimate Challenge! Bonus turn & Manual Dice unlocked to win!`);
+                    bonusTurn = true;
+                    // Auto-open manual dice for them
+                    const toggle = document.getElementById('toggle-manual-dice');
+                    if (toggle) {
+                        toggle.checked = true;
+                        window.toggleManualDice(toggle);
+                    }
+                } else {
+                    logs.unshift(`❌ <b>${player.name}</b> failed the Ultimate Challenge and ends their turn.`);
+                }
+                await updateDoc(roomDocRef, { logEvents: logs });
+
+            } else if (ladders[player.position]) {
                 const target = ladders[player.position];
                 
                 if (hasQuestions) {
                     logs.unshift(`🧠 quiz! <b>${player.name}</b> lands on a ladder. Answer correctly to climb!`);
                     await updateDoc(roomDocRef, { logEvents: logs });
 
-                    const passed = await triggerTriviaChallenge(player, true);
+                    const passed = await triggerTriviaChallenge(player, 'ladder');
                     if (passed) {
                         logs.unshift(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
                         player.position = target;
@@ -2425,7 +2495,7 @@
                     logs.unshift(`🧠 defense! <b>${player.name}</b> hit a snake. Answer correctly to block slide!`);
                     await updateDoc(roomDocRef, { logEvents: logs });
 
-                    const passed = await triggerTriviaChallenge(player, false);
+                    const passed = await triggerTriviaChallenge(player, 'snake');
                     if (passed) {
                         logs.unshift(`🛡️ Blocked! <b>${player.name}</b> successfully dodged sliding down the snake!`);
                     } else {
@@ -2499,19 +2569,47 @@
             });
         }
 
-        async function checkSnakeLadderLocal(index) {
+        async function checkSnakeLadderLocal(index, bouncedToTarget = null) {
             let player = players[index];
             const hasQuestions = gameDeck && gameDeck.length > 0;
             let bonusTurn = false;
             let checkSpecialTileAfterMovement = false;
             
-            if (ladders[player.position]) {
+            if (hasQuestions && (bouncedToTarget === 97 || bouncedToTarget === 98)) {
+                logMessage(`🔥 <b>${player.name}</b> landed on ${bouncedToTarget} and triggered the ULTIMATE CHALLENGE!`);
+                
+                const diffQs = gameDeck.filter(q => q.difficult);
+                const pool = diffQs.length > 0 ? diffQs : gameDeck;
+                let targetCount = Math.min(5, pool.length);
+                let passedAll = true;
+
+                for(let i = 0; i < targetCount; i++) {
+                    const passed = await triggerTriviaChallenge(player, 'ultimate', pool, i+1, targetCount);
+                    if (!passed) {
+                        passedAll = false;
+                        break;
+                    }
+                }
+
+                if (passedAll) {
+                    logMessage(`🌟 <b>${player.name}</b> conquered the Ultimate Challenge! Bonus turn & Manual Dice unlocked to win!`);
+                    bonusTurn = true;
+                    // Auto-open manual dice
+                    const toggle = document.getElementById('toggle-manual-dice');
+                    if (toggle) {
+                        toggle.checked = true;
+                        window.toggleManualDice(toggle);
+                    }
+                } else {
+                    logMessage(`❌ <b>${player.name}</b> failed the Ultimate Challenge and ends their turn.`);
+                }
+            } else if (ladders[player.position]) {
                 const target = ladders[player.position];
                 
                 if (hasQuestions) {
                     logMessage(`🧠 quiz! <b>${player.name}</b> lands on a ladder. Answer correctly to climb!`);
                     
-                    const passed = await triggerTriviaChallenge(player, true);
+                    const passed = await triggerTriviaChallenge(player, 'ladder');
                     if (passed) {
                         logMessage(`✅ Correct! 🚀 <b>${player.name}</b> climbed to tile ${target}!`);
                         player.position = target;
@@ -2538,7 +2636,7 @@
                 if (hasQuestions) {
                     logMessage(`🧠 defense! <b>${player.name}</b> stepped on a snake. Answer correctly to block slide!`);
                     
-                    const passed = await triggerTriviaChallenge(player, false);
+                    const passed = await triggerTriviaChallenge(player, 'snake');
                     if (passed) {
                         logMessage(`🛡️ Safe! <b>${player.name}</b> successfully dodged sliding down the snake!`);
                     } else {
