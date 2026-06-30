@@ -890,6 +890,19 @@
                         </div>
                     </div>
 
+                    <div class="mb-4 p-3 rounded-lg bg-indigo-50 border border-indigo-100">
+                        <div class="flex items-start gap-2 mb-2">
+                            <span class="text-xl leading-none">🎲</span>
+                            <div>
+                                <h3 class="text-sm font-extrabold text-indigo-950">Classic Live Session</h3>
+                                <p class="text-[11px] leading-snug text-indigo-800">Start a multi-device room with no trivia deck. Students join using the session code.</p>
+                            </div>
+                        </div>
+                        <button onclick="hostClassicLiveSession()" class="teacher-host-classic-session-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            🌐 Host Classic Room
+                        </button>
+                    </div>
+
                     <div id="collections-list" class="flex flex-col gap-2 max-h-[500px] overflow-y-auto pr-1"></div>
 
                     <div class="mt-6 pt-4 border-t border-slate-200">
@@ -901,10 +914,18 @@
 
                 <!-- Collection editor or active hosting setup -->
                 <div class="lg:col-span-8 flex flex-col gap-6">
-                    <div id="no-collection-selected" class="bg-white rounded-xl shadow p-12 text-center text-slate-500">
+                    <div id="no-collection-selected" class="bg-white rounded-xl shadow p-8 md:p-10 text-center text-slate-500">
                         <span class="text-5xl block mb-2">📁</span>
-                        <h3 class="text-lg font-bold">No Deck Selected</h3>
-                        <p class="text-sm">Choose or create a custom trivia deck in the sidebar library to begin editing or hosting live sessions.</p>
+                        <h3 class="text-lg font-bold text-slate-800">No Deck Selected</h3>
+                        <p class="text-sm max-w-xl mx-auto">Choose a custom trivia deck to edit questions, or start a Classic Live Session without questions.</p>
+                        <div class="mt-5 flex flex-col sm:flex-row justify-center gap-2">
+                            <button onclick="hostClassicLiveSession()" class="teacher-host-classic-session-btn bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                🌐 Host Classic Live Session
+                            </button>
+                            <button onclick="openCreateCollectionModal()" class="bg-purple-950 hover:bg-purple-900 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
+                                + Create Question Deck
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Selected Deck view -->
@@ -1141,9 +1162,17 @@
         function updateTeacherSessionControls() {
             const btnHost = document.getElementById('btn-teacher-host-session');
             const btnEnd = document.getElementById('btn-teacher-end-session');
+            const classicButtons = document.querySelectorAll('.teacher-host-classic-session-btn');
+            const isHosting = activeRoomId && currentRole === 'teacher-host';
+
+            classicButtons.forEach(btn => {
+                btn.disabled = !!isHosting;
+                btn.innerText = isHosting ? '🌐 Classic Room Active' : (btn.classList.contains('w-full') ? '🌐 Host Classic Room' : '🌐 Host Classic Live Session');
+            });
+            
             if (!btnHost || !btnEnd) return;
             
-            if (activeRoomId && currentRole === 'teacher-host') {
+            if (isHosting) {
                 btnHost.classList.add('hidden');
                 btnEnd.classList.remove('hidden');
             } else {
@@ -1918,7 +1947,7 @@
             return code;
         }
 
-        function hostLiveSession() {
+        function createLiveSession(deckName, questions = []) {
             if (activeRoomId) {
                 showAlert("Already Hosting", "You are already hosting a live session. Please end it before starting a new one.", "🛑");
                 return;
@@ -1929,15 +1958,13 @@
                 return;
             }
 
-            const colObj = dbCollections.find(c => c.id === selectedCollectionId);
-            if (!colObj) return;
-
             const roomCode = generateRoomCode();
             setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', roomCode), {
                 sessionId: roomCode,
                 teacherId: currentUser.uid,
-                deckName: colObj.name,
-                questions: colObj.questions || [],
+                deckName: deckName,
+                questions: questions || [],
+                isClassicMode: !questions || questions.length === 0,
                 status: 'waiting', 
                 players: [],
                 currentPlayerIndex: 0,
@@ -1972,6 +1999,21 @@
             .catch((err) => {
                 showAlert("Error", "Could not spin up live session: " + err.message);
             });
+        }
+
+        function hostClassicLiveSession() {
+            createLiveSession('Classic Mode (No Questions)', []);
+        }
+        window.hostClassicLiveSession = hostClassicLiveSession;
+
+        function hostLiveSession() {
+            const colObj = dbCollections.find(c => c.id === selectedCollectionId);
+            if (!colObj) {
+                showAlert("No Deck Selected", "Please select a trivia deck, or use Classic Live Session to host without questions.", "📚");
+                return;
+            }
+
+            createLiveSession(colObj.name, colObj.questions || []);
         }
         window.hostLiveSession = hostLiveSession;
 
@@ -2043,10 +2085,14 @@
                         return;
                     }
                     
+                    const startLog = rData.questions && rData.questions.length > 0
+                        ? '⚔️ Multiplayer session started! Answer quiz prompts to move!'
+                        : '🎲 Classic multiplayer session started! No quiz questions this round.';
+
                     updateDoc(roomDocRef, {
                         status: 'playing',
                         currentPlayerIndex: 0,
-                        logEvents: ['⚔️ Multiplayer session started! Answer quiz prompts to move!']
+                        logEvents: [startLog]
                     });
                 }
             });
