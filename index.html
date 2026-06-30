@@ -768,7 +768,8 @@
                         <span>⌛ Room Lobby</span>
                         <span id="lobby-code-badge" class="bg-purple-100 text-purple-950 px-3 py-1 rounded-full font-mono text-sm">CODE</span>
                     </h2>
-                    <p class="text-xs text-slate-500 mb-4">Wait here. The match starts when the teacher presses start.</p>
+                    <p class="text-xs text-slate-500 mb-1">Wait here. The match starts when the teacher presses start.</p>
+                    <p id="lobby-player-limit-text" class="text-[11px] font-semibold text-indigo-700 mb-4">Players: 0 / 6</p>
                     <div class="space-y-3">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Players Connected</h3>
                         <div id="lobby-players-list" class="flex flex-col gap-2 max-h-48 overflow-y-auto"></div>
@@ -898,8 +899,21 @@
                                 <p class="text-[11px] leading-snug text-indigo-800">Start a multi-device room with no trivia deck. Students join using the session code.</p>
                             </div>
                         </div>
+                        <div class="mb-2">
+                            <label class="block text-[11px] font-bold text-indigo-950 mb-1">Max players allowed to join</label>
+                            <select id="teacher-live-player-limit" class="w-full p-2 rounded-lg border border-indigo-200 bg-white text-xs font-bold text-indigo-950 focus:ring-2 focus:ring-indigo-400">
+                                <option value="2">2 Players</option>
+                                <option value="3">3 Players</option>
+                                <option value="4">4 Players</option>
+                                <option value="5">5 Players</option>
+                                <option value="6" selected>6 Players</option>
+                            </select>
+                        </div>
                         <button onclick="hostClassicLiveSession()" class="teacher-host-classic-session-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed">
                             🌐 Host Classic Room
+                        </button>
+                        <button onclick="endSessionGame()" class="teacher-end-session-btn hidden w-full mt-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 rounded-lg shadow transition">
+                            🛑 End Active Session
                         </button>
                     </div>
 
@@ -918,9 +932,13 @@
                         <span class="text-5xl block mb-2">📁</span>
                         <h3 class="text-lg font-bold text-slate-800">No Deck Selected</h3>
                         <p class="text-sm max-w-xl mx-auto">Choose a custom trivia deck to edit questions, or start a Classic Live Session without questions.</p>
+                        <p class="text-xs text-indigo-700 font-semibold mt-2">Set the max players in the Classic Live Session box before hosting any live room.</p>
                         <div class="mt-5 flex flex-col sm:flex-row justify-center gap-2">
                             <button onclick="hostClassicLiveSession()" class="teacher-host-classic-session-btn bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
                                 🌐 Host Classic Live Session
+                            </button>
+                            <button onclick="endSessionGame()" class="teacher-end-session-btn hidden bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
+                                🛑 End Active Session
                             </button>
                             <button onclick="openCreateCollectionModal()" class="bg-purple-950 hover:bg-purple-900 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
                                 + Create Question Deck
@@ -942,7 +960,7 @@
                                 <button id="btn-teacher-host-session" onclick="hostLiveSession()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
                                     🌐 Host Live
                                 </button>
-                                <button id="btn-teacher-end-session" onclick="endSessionGame()" class="hidden bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
+                                <button id="btn-teacher-end-session" onclick="endSessionGame()" class="teacher-end-session-btn hidden bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
                                     🛑 End Session
                                 </button>
                                 <button onclick="openCsvModal()" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow transition">
@@ -1135,9 +1153,48 @@
         let editingCollectionId = null;
         let editingQuestionIndex = null;
 
+        function getTeacherLivePlayerLimit() {
+            const limitEl = document.getElementById('teacher-live-player-limit');
+            const parsed = limitEl ? parseInt(limitEl.value, 10) : 6;
+            if (Number.isNaN(parsed)) return 6;
+            return Math.max(2, Math.min(6, parsed));
+        }
+
+        function setManualDiceLiveLock(isLocked) {
+            const toggle = document.getElementById('toggle-manual-dice');
+            const container = document.getElementById('manual-dice-buttons');
+            const toggleShell = toggle ? toggle.closest('label') : null;
+
+            if (toggle) {
+                toggle.checked = false;
+                toggle.disabled = !!isLocked;
+            }
+            if (container) {
+                container.classList.add('hidden');
+            }
+            if (toggleShell) {
+                toggleShell.classList.toggle('opacity-40', !!isLocked);
+                toggleShell.classList.toggle('cursor-not-allowed', !!isLocked);
+                toggleShell.classList.toggle('cursor-pointer', !isLocked);
+            }
+            disableManualButtons(true);
+        }
+
+        function updateLobbyPlayerLimitText(currentCount = 0, maxPlayers = 6) {
+            const textEl = document.getElementById('lobby-player-limit-text');
+            if (textEl) {
+                textEl.innerText = `Players: ${currentCount} / ${maxPlayers}`;
+            }
+        }
+
         // --- DECLARE LOCAL MODULE FUNCTIONS ---
 
         window.toggleManualDice = function(checkbox) {
+            if (activeRoomId) {
+                checkbox.checked = false;
+                setManualDiceLiveLock(true);
+                return;
+            }
             const container = document.getElementById('manual-dice-buttons');
             if (checkbox.checked) {
                 container.classList.remove('hidden');
@@ -1153,6 +1210,7 @@
         }
 
         function manualRoll(val) {
+            if (activeRoomId) return;
             const diceBtn = document.getElementById('dice-btn');
             if (diceBtn.disabled) return;
             rollDice(val);
@@ -1161,23 +1219,28 @@
 
         function updateTeacherSessionControls() {
             const btnHost = document.getElementById('btn-teacher-host-session');
-            const btnEnd = document.getElementById('btn-teacher-end-session');
             const classicButtons = document.querySelectorAll('.teacher-host-classic-session-btn');
-            const isHosting = activeRoomId && currentRole === 'teacher-host';
+            const endButtons = document.querySelectorAll('.teacher-end-session-btn');
+            const playerLimitSelect = document.getElementById('teacher-live-player-limit');
+            const isHosting = !!(activeRoomId && currentRole === 'teacher-host');
+
+            if (playerLimitSelect) {
+                playerLimitSelect.disabled = isHosting;
+                playerLimitSelect.classList.toggle('opacity-60', isHosting);
+                playerLimitSelect.classList.toggle('cursor-not-allowed', isHosting);
+            }
 
             classicButtons.forEach(btn => {
-                btn.disabled = !!isHosting;
-                btn.innerText = isHosting ? '🌐 Classic Room Active' : (btn.classList.contains('w-full') ? '🌐 Host Classic Room' : '🌐 Host Classic Live Session');
+                btn.disabled = isHosting;
+                btn.innerText = isHosting ? '🌐 Live Room Active' : (btn.classList.contains('w-full') ? '🌐 Host Classic Room' : '🌐 Host Classic Live Session');
+            });
+
+            endButtons.forEach(btn => {
+                btn.classList.toggle('hidden', !isHosting);
             });
             
-            if (!btnHost || !btnEnd) return;
-            
-            if (isHosting) {
-                btnHost.classList.add('hidden');
-                btnEnd.classList.remove('hidden');
-            } else {
-                btnHost.classList.remove('hidden');
-                btnEnd.classList.add('hidden');
+            if (btnHost) {
+                btnHost.classList.toggle('hidden', isHosting);
             }
         }
         window.updateTeacherSessionControls = updateTeacherSessionControls;
@@ -1610,6 +1673,7 @@
         }
 
         window.processSkipTurn = async function() {
+            if (activeRoomId && currentRole === 'teacher-host') return;
             const diceBtn = document.getElementById('dice-btn');
             diceBtn.disabled = true;
             disableManualButtons(true);
@@ -1958,6 +2022,7 @@
                 return;
             }
 
+            const maxPlayers = getTeacherLivePlayerLimit();
             const roomCode = generateRoomCode();
             setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameSessions', roomCode), {
                 sessionId: roomCode,
@@ -1965,6 +2030,7 @@
                 deckName: deckName,
                 questions: questions || [],
                 isClassicMode: !questions || questions.length === 0,
+                maxPlayers: maxPlayers,
                 status: 'waiting', 
                 players: [],
                 currentPlayerIndex: 0,
@@ -1979,6 +2045,8 @@
                 document.getElementById('game-selection-panel').classList.add('hidden');
                 document.getElementById('session-lobby-panel').classList.remove('hidden');
                 document.getElementById('lobby-code-badge').innerText = roomCode;
+                updateLobbyPlayerLimitText(0, maxPlayers);
+                setManualDiceLiveLock(true);
 
                 currentRole = 'teacher-host';
                 activeRoomId = roomCode;
@@ -2040,6 +2108,12 @@
                         return;
                     }
 
+                    const maxPlayers = roomData.maxPlayers || 6;
+                    if ((roomData.players || []).length >= maxPlayers) {
+                        showAlert("Room Full", `This room is already full. Maximum players allowed: ${maxPlayers}.`, "🚫");
+                        return;
+                    }
+
                     const deviceUserId = currentUser ? currentUser.uid : crypto.randomUUID();
                     currentConnectedPlayerId = deviceUserId;
 
@@ -2058,6 +2132,8 @@
                         document.getElementById('game-selection-panel').classList.add('hidden');
                         document.getElementById('session-lobby-panel').classList.remove('hidden');
                         document.getElementById('lobby-code-badge').innerText = codeInput;
+                        updateLobbyPlayerLimitText(updatedPlayers.length, maxPlayers);
+                        setManualDiceLiveLock(true);
 
                         const startBtn = document.getElementById('btn-lobby-host-start');
                         if (startBtn) startBtn.remove();
@@ -2114,6 +2190,10 @@
                 
                 if (data.status === 'waiting') {
                     const playersList = document.getElementById('lobby-players-list');
+                    const maxPlayers = data.maxPlayers || 6;
+                    const connectedCount = data.players ? data.players.length : 0;
+                    updateLobbyPlayerLimitText(connectedCount, maxPlayers);
+                    setManualDiceLiveLock(true);
                     playersList.innerHTML = '';
                     data.players.forEach(p => {
                         playersList.innerHTML += `
@@ -2126,6 +2206,9 @@
                             </div>
                         `;
                     });
+                    if (connectedCount >= maxPlayers) {
+                        playersList.innerHTML += `<div class="text-center text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg p-2">Room is full.</div>`;
+                    }
                 } 
                 else if (data.status === 'playing' || data.status === 'complete') {
                     document.getElementById('session-lobby-panel').classList.add('hidden');
@@ -2136,6 +2219,8 @@
                     idIndicator.classList.remove('hidden');
 
                     gameDeck = data.questions || [];
+                    updateLobbyPlayerLimitText(data.players ? data.players.length : 0, data.maxPlayers || 6);
+                    setManualDiceLiveLock(true);
                     syncPlayerBoardChips(data);
                 }
             }, (err) => {
@@ -2192,6 +2277,15 @@
 
             const currentRollPlayer = data.players[data.currentPlayerIndex];
             const diceBtn = document.getElementById('dice-btn');
+            setManualDiceLiveLock(true);
+
+            if (!currentRollPlayer) {
+                diceBtn.disabled = true;
+                diceBtn.innerText = '⌛ Waiting for players...';
+                diceBtn.className = "w-full bg-indigo-100 text-indigo-800 border-2 border-indigo-200 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
+                renderControlButtons();
+                return;
+            }
 
             if (data.status === 'complete') {
                 diceBtn.disabled = true;
@@ -2210,12 +2304,17 @@
                 }
             } else {
                 if (currentRollPlayer.skipTurns > 0) {
-                    if (currentRole === 'teacher-host' || currentRollPlayer.uid === currentConnectedPlayerId) {
+                    if (currentRole !== 'teacher-host' && currentRollPlayer.uid === currentConnectedPlayerId) {
                         diceBtn.disabled = false;
                         disableManualButtons(true);
                         diceBtn.onclick = processSkipTurn;
                         diceBtn.innerText = "🛑 Skip Turn (Penalty)";
                         diceBtn.className = "w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
+                    } else if (currentRole === 'teacher-host') {
+                        diceBtn.disabled = true;
+                        disableManualButtons(true);
+                        diceBtn.innerText = `👀 Spectating: ${currentRollPlayer.name}'s Penalty Turn`;
+                        diceBtn.className = "w-full bg-indigo-100 text-indigo-800 border-2 border-indigo-200 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
                     } else {
                         diceBtn.disabled = true;
                         disableManualButtons(true);
@@ -2231,7 +2330,7 @@
                         diceBtn.className = "w-full bg-indigo-100 text-indigo-800 border-2 border-indigo-200 font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1 cursor-not-allowed";
                     } else if (currentRollPlayer.uid === currentConnectedPlayerId) {
                         diceBtn.disabled = false;
-                        disableManualButtons(false);
+                        disableManualButtons(true);
                         diceBtn.onclick = () => rollDice();
                         diceBtn.innerText = "🎲 YOUR TURN: ROLL!";
                         diceBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
@@ -3283,6 +3382,7 @@
             document.querySelectorAll('.token').forEach(t => t.remove());
             
             activeRoomId = null;
+            setManualDiceLiveLock(false);
             createBoard();
             updateTeacherSessionControls();
         }
