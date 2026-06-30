@@ -895,13 +895,13 @@
                         <div class="flex items-start gap-2 mb-2">
                             <span class="text-xl leading-none">🎲</span>
                             <div>
-                                <h3 class="text-sm font-extrabold text-indigo-950">Classic Live Session</h3>
-                                <p class="text-[11px] leading-snug text-indigo-800">Start a multi-device room with no trivia deck. Students join using the session code.</p>
+                                <h3 class="text-sm font-extrabold text-indigo-950">Live Session Settings</h3>
+                                <p class="text-[11px] leading-snug text-indigo-800">Set these before hosting either a classic room or a question-deck live session.</p>
                             </div>
                         </div>
                         <div class="mb-2">
                             <label class="block text-[11px] font-bold text-indigo-950 mb-1">Max total players in room</label>
-                            <select id="teacher-live-player-limit" class="w-full p-2 rounded-lg border border-indigo-200 bg-white text-xs font-bold text-indigo-950 focus:ring-2 focus:ring-indigo-400">
+                            <select id="teacher-live-player-limit" onchange="syncTeacherLiveSettings(this)" class="teacher-live-player-limit-control w-full p-2 rounded-lg border border-indigo-200 bg-white text-xs font-bold text-indigo-950 focus:ring-2 focus:ring-indigo-400">
                                 <option value="2">2 Players</option>
                                 <option value="3">3 Players</option>
                                 <option value="4">4 Players</option>
@@ -911,7 +911,7 @@
                             <p class="mt-1 text-[10px] leading-snug text-indigo-700">If the teacher joins as a player, the teacher uses 1 player slot.</p>
                         </div>
                         <label class="mb-3 flex items-start gap-2 rounded-lg bg-white/80 border border-indigo-100 p-2 text-[11px] font-semibold text-indigo-950 cursor-pointer">
-                            <input type="checkbox" id="teacher-join-as-player" class="mt-0.5 h-4 w-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
+                            <input type="checkbox" id="teacher-join-as-player" onchange="syncTeacherLiveSettings(this)" class="teacher-join-as-player-control mt-0.5 h-4 w-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
                             <span>Teacher joins as a player instead of watching only</span>
                         </label>
                         <button onclick="hostClassicLiveSession()" class="teacher-host-classic-session-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed">
@@ -957,6 +957,22 @@
                             <div>
                                 <h2 class="text-2xl font-extrabold text-slate-900" id="current-col-title">Deck Title</h2>
                                 <p class="text-sm text-slate-500">Edit trivia cards or spin up a multiplayer live session</p>
+                            </div>
+                            <div class="w-full lg:w-auto flex flex-col sm:flex-row sm:items-end gap-2 rounded-xl bg-indigo-50 border border-indigo-100 p-3">
+                                <div class="min-w-[150px]">
+                                    <label class="block text-[11px] font-bold text-indigo-950 mb-1">Max players for this live room</label>
+                                    <select id="teacher-live-player-limit-deck" onchange="syncTeacherLiveSettings(this)" class="teacher-live-player-limit-control w-full p-2 rounded-lg border border-indigo-200 bg-white text-xs font-bold text-indigo-950 focus:ring-2 focus:ring-indigo-400">
+                                        <option value="2">2 Players</option>
+                                        <option value="3">3 Players</option>
+                                        <option value="4">4 Players</option>
+                                        <option value="5">5 Players</option>
+                                        <option value="6" selected>6 Players</option>
+                                    </select>
+                                </div>
+                                <label class="flex items-start gap-2 rounded-lg bg-white/80 border border-indigo-100 p-2 text-[11px] font-semibold text-indigo-950 cursor-pointer max-w-[230px]">
+                                    <input type="checkbox" id="teacher-join-as-player-deck" onchange="syncTeacherLiveSettings(this)" class="teacher-join-as-player-control mt-0.5 h-4 w-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
+                                    <span>Teacher joins as player</span>
+                                </label>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <button onclick="startLocalGameFromTeacher()" class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md transition">
@@ -1158,15 +1174,32 @@
         let editingCollectionId = null;
         let editingQuestionIndex = null;
 
+        function syncTeacherLiveSettings(sourceEl = null) {
+            if (!sourceEl) return;
+
+            if (sourceEl.classList.contains('teacher-live-player-limit-control')) {
+                document.querySelectorAll('.teacher-live-player-limit-control').forEach(el => {
+                    if (el !== sourceEl) el.value = sourceEl.value;
+                });
+            }
+
+            if (sourceEl.classList.contains('teacher-join-as-player-control')) {
+                document.querySelectorAll('.teacher-join-as-player-control').forEach(el => {
+                    if (el !== sourceEl) el.checked = sourceEl.checked;
+                });
+            }
+        }
+        window.syncTeacherLiveSettings = syncTeacherLiveSettings;
+
         function getTeacherLivePlayerLimit() {
-            const limitEl = document.getElementById('teacher-live-player-limit');
+            const limitEl = document.querySelector('.teacher-live-player-limit-control');
             const parsed = limitEl ? parseInt(limitEl.value, 10) : 6;
             if (Number.isNaN(parsed)) return 6;
             return Math.max(2, Math.min(6, parsed));
         }
 
         function getTeacherJoinAsPlayer() {
-            const joinEl = document.getElementById('teacher-join-as-player');
+            const joinEl = document.querySelector('.teacher-join-as-player-control');
             return !!(joinEl && joinEl.checked);
         }
 
@@ -1293,21 +1326,21 @@
             const btnHost = document.getElementById('btn-teacher-host-session');
             const classicButtons = document.querySelectorAll('.teacher-host-classic-session-btn');
             const endButtons = document.querySelectorAll('.teacher-end-session-btn');
-            const playerLimitSelect = document.getElementById('teacher-live-player-limit');
-            const teacherJoinOption = document.getElementById('teacher-join-as-player');
+            const playerLimitSelects = document.querySelectorAll('.teacher-live-player-limit-control');
+            const teacherJoinOptions = document.querySelectorAll('.teacher-join-as-player-control');
             const isHosting = !!(activeRoomId && currentRole === 'teacher-host');
 
-            if (playerLimitSelect) {
+            playerLimitSelects.forEach(playerLimitSelect => {
                 playerLimitSelect.disabled = isHosting;
                 playerLimitSelect.classList.toggle('opacity-60', isHosting);
                 playerLimitSelect.classList.toggle('cursor-not-allowed', isHosting);
-            }
+            });
 
-            if (teacherJoinOption) {
+            teacherJoinOptions.forEach(teacherJoinOption => {
                 teacherJoinOption.disabled = isHosting;
                 teacherJoinOption.closest('label')?.classList.toggle('opacity-60', isHosting);
                 teacherJoinOption.closest('label')?.classList.toggle('cursor-not-allowed', isHosting);
-            }
+            });
 
             classicButtons.forEach(btn => {
                 btn.disabled = isHosting;
@@ -3514,6 +3547,10 @@
         try {
             createBoard();
             generatePlayerInputs();
+            const defaultLimitControl = document.getElementById('teacher-live-player-limit');
+            if (defaultLimitControl) syncTeacherLiveSettings(defaultLimitControl);
+            const defaultTeacherJoinControl = document.getElementById('teacher-join-as-player');
+            if (defaultTeacherJoinControl) syncTeacherLiveSettings(defaultTeacherJoinControl);
             drawSnakesAndLadders();
             loadLocalSession();
         } catch (e) {
