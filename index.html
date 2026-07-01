@@ -1137,6 +1137,7 @@
         let activeDeviceMode = 'local'; // 'local' or 'session'
         let currentRole = 'player'; // 'player' or 'teacher-host'
         let currentConnectedPlayerId = null;
+        let latestRoomState = null;
 
         const defaultMathCollection = {
             id: 'default-math',
@@ -1265,24 +1266,39 @@
             return true;
         }
 
-        function setManualDiceLiveLock(isLocked) {
+        function isManualDiceLiveUnlocked(data, currentRollPlayer) {
+            if (!activeRoomId || !data || data.status !== 'playing') return false;
+            if (!currentRollPlayer || !isCurrentDevicePlayerTurn(data, currentRollPlayer)) return false;
+            const unlock = data.manualDiceUnlock;
+            if (!unlock || !unlock.playerUid) return false;
+            return unlock.playerUid === currentRollPlayer.uid;
+        }
+
+        function setManualDiceLiveLock(isLocked, forceOpen = false) {
             const toggle = document.getElementById('toggle-manual-dice');
             const container = document.getElementById('manual-dice-buttons');
             const toggleShell = toggle ? toggle.closest('label') : null;
+            const locked = !!isLocked;
 
             if (toggle) {
-                toggle.checked = false;
-                toggle.disabled = !!isLocked;
+                toggle.disabled = locked;
+                if (locked) {
+                    toggle.checked = false;
+                } else if (forceOpen) {
+                    toggle.checked = true;
+                }
             }
+
+            const shouldShowButtons = !locked && !!toggle && toggle.checked;
             if (container) {
-                container.classList.add('hidden');
+                container.classList.toggle('hidden', !shouldShowButtons);
             }
             if (toggleShell) {
-                toggleShell.classList.toggle('opacity-40', !!isLocked);
-                toggleShell.classList.toggle('cursor-not-allowed', !!isLocked);
-                toggleShell.classList.toggle('cursor-pointer', !isLocked);
+                toggleShell.classList.toggle('opacity-40', locked);
+                toggleShell.classList.toggle('cursor-not-allowed', locked);
+                toggleShell.classList.toggle('cursor-pointer', !locked);
             }
-            disableManualButtons(true);
+            disableManualButtons(!shouldShowButtons);
         }
 
         function updateLobbyPlayerLimitText(currentCount = 0, maxPlayers = 6) {
@@ -1295,12 +1311,27 @@
         // --- DECLARE LOCAL MODULE FUNCTIONS ---
 
         window.toggleManualDice = function(checkbox) {
+            const container = document.getElementById('manual-dice-buttons');
+
             if (activeRoomId) {
-                checkbox.checked = false;
-                setManualDiceLiveLock(true);
+                const roomPlayers = latestRoomState && latestRoomState.players ? latestRoomState.players : [];
+                const currentRollPlayer = roomPlayers[latestRoomState ? latestRoomState.currentPlayerIndex : -1];
+                if (!isManualDiceLiveUnlocked(latestRoomState, currentRollPlayer)) {
+                    checkbox.checked = false;
+                    setManualDiceLiveLock(true);
+                    return;
+                }
+
+                if (checkbox.checked) {
+                    container.classList.remove('hidden');
+                    disableManualButtons(false);
+                } else {
+                    container.classList.add('hidden');
+                    disableManualButtons(true);
+                }
                 return;
             }
-            const container = document.getElementById('manual-dice-buttons');
+
             if (checkbox.checked) {
                 container.classList.remove('hidden');
             } else {
@@ -1315,8 +1346,20 @@
         }
 
         function manualRoll(val) {
-            if (activeRoomId) return;
             const diceBtn = document.getElementById('dice-btn');
+
+            if (activeRoomId) {
+                const roomPlayers = latestRoomState && latestRoomState.players ? latestRoomState.players : [];
+                const currentRollPlayer = roomPlayers[latestRoomState ? latestRoomState.currentPlayerIndex : -1];
+                if (!isManualDiceLiveUnlocked(latestRoomState, currentRollPlayer)) {
+                    showAlert("Manual Dice Locked", "Manual dice is only available to the player who passed the Ultimate Challenge on tile 97 or 98.", "🔒");
+                    return;
+                }
+                if (diceBtn.disabled) return;
+                rollDice(val);
+                return;
+            }
+
             if (diceBtn.disabled) return;
             rollDice(val);
         }
@@ -1813,6 +1856,7 @@
                     players: updatedPlayersArray,
                     currentPlayerIndex: nextIdx,
                     animationState: null,
+                    manualDiceUnlock: null,
                     logEvents: logs
                 });
             } else {
@@ -2163,6 +2207,7 @@
                 currentPlayerIndex: 0,
                 diceResult: '-',
                 animationState: null,
+                manualDiceUnlock: null,
                 logEvents: teacherCanPlay ? ['👨‍🏫 Teacher joined this room as a player.'] : [],
                 timestamp: Date.now()
             })
@@ -2318,6 +2363,7 @@
                 }
 
                 const data = snap.data();
+                latestRoomState = data;
                 
                 if (data.status === 'waiting') {
                     const playersList = document.getElementById('lobby-players-list');
@@ -2439,6 +2485,13 @@
             }
 
             const canThisDevicePlayTurn = isCurrentDevicePlayerTurn(data, currentRollPlayer);
+            const manualLiveUnlocked = isManualDiceLiveUnlocked(data, currentRollPlayer);
+
+            if (manualLiveUnlocked) {
+                setManualDiceLiveLock(false, true);
+            } else {
+                setManualDiceLiveLock(true);
+            }
 
             if (data.status === 'complete') {
                 diceBtn.disabled = true;
@@ -2478,9 +2531,15 @@
                 } else {
                     if (canThisDevicePlayTurn) {
                         diceBtn.disabled = false;
-                        disableManualButtons(true);
+                        if (manualLiveUnlocked) {
+                            setManualDiceLiveLock(false, true);
+                        } else {
+                            disableManualButtons(true);
+                        }
                         diceBtn.onclick = () => rollDice();
-                        diceBtn.innerText = currentRole === 'teacher-host' ? "🎲 TEACHER TURN: ROLL!" : "🎲 YOUR TURN: ROLL!";
+                        diceBtn.innerText = manualLiveUnlocked
+                            ? (currentRole === 'teacher-host' ? "🎯 TEACHER ULTIMATE: USE MANUAL DIE!" : "🎯 ULTIMATE BONUS: USE MANUAL DIE!")
+                            : (currentRole === 'teacher-host' ? "🎲 TEACHER TURN: ROLL!" : "🎲 YOUR TURN: ROLL!");
                         diceBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-xl shadow transition-all text-xl flex flex-col items-center justify-center gap-1";
                     } else if (currentRole === 'teacher-host') {
                         diceBtn.disabled = true;
@@ -2894,6 +2953,7 @@
                                 currentPlayerIndex: 0,
                                 diceResult: '-',
                                 animationState: null,
+                                manualDiceUnlock: null,
                                 status: 'playing', 
                                 logEvents: ['🔄 Host reset the session! All players are back at start.']
                             });
@@ -3003,18 +3063,29 @@
                 }
 
                 const rollBtn = document.getElementById('dice-btn');
+                const manualLiveUnlocked = isManualDiceLiveUnlocked(rData, currentRollPlayer);
+
+                if (isManual && !manualLiveUnlocked) {
+                    showAlert("Manual Dice Locked", "Manual dice is only available after this player passes the Ultimate Challenge on tile 97 or 98.", "🔒");
+                    return;
+                }
+
                 rollBtn.disabled = true;
                 disableManualButtons(true);
 
-                // Manual dice is intentionally unavailable in live sessions so all connected devices stay synchronized.
-                let diceRollAnim = 1;
-                for(let i=0; i<4; i++) {
-                    diceRollAnim = Math.floor(Math.random() * 6) + 1;
-                    document.getElementById('dice-result').innerText = `🎲 ${diceRollAnim}`;
-                    await sleep(100);
+                if (isManual) {
+                    roll = manualVal;
+                    document.getElementById('dice-result').innerText = `🎯 ${roll} (Manual)`;
+                } else {
+                    let diceRollAnim = 1;
+                    for(let i=0; i<4; i++) {
+                        diceRollAnim = Math.floor(Math.random() * 6) + 1;
+                        document.getElementById('dice-result').innerText = `🎲 ${diceRollAnim}`;
+                        await sleep(100);
+                    }
+                    roll = Math.floor(Math.random() * 6) + 1;
+                    document.getElementById('dice-result').innerText = `🎲 ${roll}`;
                 }
-                roll = Math.floor(Math.random() * 6) + 1;
-                document.getElementById('dice-result').innerText = `🎲 ${roll}`;
                 
                 // Deep clone to guarantee Firestore detects the state change
                 let activePlayer = { ...currentRollPlayer };
@@ -3022,7 +3093,7 @@
                 let calculatedTarget = oldPos + roll;
                 let logs = [...(rData.logEvents || [])];
 
-                logs.unshift(`🎲 <b>${activePlayer.name}</b> rolled a ${roll}.`);
+                logs.unshift(`${isManual ? '🎯' : '🎲'} <b>${activePlayer.name}</b> rolled a ${roll}${isManual ? ' with the Ultimate manual die' : ''}.`);
 
                 let pathSequence = [];
                 let bounceBackTarget = null;
@@ -3049,7 +3120,8 @@
                 updatedPlayersArray[rData.currentPlayerIndex] = activePlayer;
 
                 await updateDoc(roomDocRef, {
-                    diceResult: `🎲 ${roll}`,
+                    diceResult: `${isManual ? '🎯' : '🎲'} ${roll}`,
+                    manualDiceUnlock: null,
                     logEvents: logs
                 });
 
@@ -3230,16 +3302,22 @@
                 if (passedAll) {
                     logs.unshift(`🌟 <b>${player.name}</b> conquered the Ultimate Challenge! Bonus turn & Manual Dice unlocked to win!`);
                     bonusTurn = true;
-                    // Auto-open manual dice for them
-                    const toggle = document.getElementById('toggle-manual-dice');
-                    if (toggle) {
-                        toggle.checked = true;
-                        window.toggleManualDice(toggle);
-                    }
+                    await updateDoc(roomDocRef, {
+                        logEvents: logs,
+                        manualDiceUnlock: {
+                            playerUid: player.uid,
+                            playerIndex: index,
+                            reason: 'ultimate-97-98',
+                            grantedAt: Date.now()
+                        }
+                    });
                 } else {
                     logs.unshift(`❌ <b>${player.name}</b> failed the Ultimate Challenge and ends their turn.`);
+                    await updateDoc(roomDocRef, {
+                        logEvents: logs,
+                        manualDiceUnlock: null
+                    });
                 }
-                await updateDoc(roomDocRef, { logEvents: logs });
 
             } else if (ladders[player.position]) {
                 const target = ladders[player.position];
@@ -3504,6 +3582,7 @@
             
             activeRoomId = null;
             currentConnectedPlayerId = null;
+            latestRoomState = null;
             lastProcessedAnimationId = null;
             setManualDiceLiveLock(false);
             createBoard();
