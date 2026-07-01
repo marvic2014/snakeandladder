@@ -1456,6 +1456,19 @@
 
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+        function shufflePlayersForTurnOrder(playerList) {
+            const shuffled = [...(playerList || [])];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        function formatTurnOrder(playerList) {
+            return (playerList || []).map((p, idx) => `${idx + 1}. ${p.name}`).join(' → ');
+        }
+
         function createBoard() {
             const board = document.getElementById('board');
             board.innerHTML = '';
@@ -2335,13 +2348,16 @@
                         return;
                     }
                     
+                    const randomizedPlayers = shufflePlayersForTurnOrder(rData.players || []);
                     const startLog = rData.questions && rData.questions.length > 0
                         ? '⚔️ Multiplayer session started! Answer quiz prompts to move!'
                         : '🎲 Classic multiplayer session started! No quiz questions this round.';
-                    const logs = [startLog, ...(rData.logEvents || [])];
+                    const orderLog = `🔀 Random turn order: <b>${formatTurnOrder(randomizedPlayers)}</b>`;
+                    const logs = [startLog, orderLog, ...(rData.logEvents || [])];
 
                     updateDoc(roomDocRef, {
                         status: 'playing',
+                        players: randomizedPlayers,
                         currentPlayerIndex: 0,
                         animationState: null,
                         logEvents: logs
@@ -3022,6 +3038,8 @@
                 });
             }
 
+            players = shufflePlayersForTurnOrder(players);
+
             document.getElementById('game-selection-panel').classList.add('hidden');
             document.getElementById('game-active-panel').classList.remove('hidden');
             document.getElementById('game-log').innerHTML = '';
@@ -3037,7 +3055,8 @@
             updateTurnUI();
             drawSnakesAndLadders();
             players.forEach((p, index) => updateTokenPosition(index));
-            logMessage(`🖥️ Classic Local Device Game Initialized.`);
+            logMessage(`🖥️ Local Device Game Initialized.`);
+            logMessage(`🔀 Random turn order: <b>${formatTurnOrder(players)}</b>`);
             
             // Build Controls
             renderControlButtons();
